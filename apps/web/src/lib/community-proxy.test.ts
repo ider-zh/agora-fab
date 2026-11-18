@@ -1,0 +1,145 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { proxyCommunity } from './community-proxy';
+
+const origin = 'https://community.example.test';
+const id = '11111111-2222-4333-a444-555555555555';
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
+
+function fixture(body = '{}', extra: HeadersInit = {}, method = 'POST') {
+  return new Request(`${origin}/api/community/example?ignored=1`, {
+    method,
+    headers: {
+      origin,
+      cookie: 'other=value; __Host-agorafab_session=fixture',
+      'content-type': 'application/json',
+      'sec-fetch-site': 'same-origin',
+      'idempotency-key': 'submit-one',
+      authorization: 'Bearer discarded',
+      ...extra,
+    },
+    body,
+  });
+}
+
+describe('community browser mutation boundary', () => {
+  it('only forwards approved mutable routes and the fields required by Fastify', async () => {
+    vi.stubEnv('API_INTERNAL_URL', 'http://api.example.test:3001');
+    const fakeFetch = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json(
+          { post: { id } },
+          { status: 201, headers: { 'Set-Cookie': 'unrelated=never-forward' } },
+        ),
+      );
+    vi.stubGlobal('fetch', fakeFetch);
+    const body = JSON.stringify({ bodyMd: 'Hello' });
+    const response = await proxyCommunity(fixture(body), [
+      'topics',
+      'daily-inspiration',
+      'posts',
+    ]);
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ post: { id } });
+    expect(response.headers.get('set-cookie')).toBeNull();
+    const [url, options] = fakeFetch.mock.calls[0]!;
+    expect(String(url)).toBe(
+      'http://api.example.test:3001/api/topics/daily-inspiration/posts',
+    );
+    expect(Object.fromEntries(options.headers)).toEqual({
+      origin,
+      cookie: '__Host-agorafab_session=fixture',
+      'content-type': 'application/json',
+      'idempotency-key': 'submit-one',
+    });
+    expect(options).toMatchObject({ body, method: 'POST', redirect: 'manual' });
+  });
+
+  it('does not forward cross-origin, anonymous, credential or path traversal requests', async () => {
+    const fakeFetch = vi.fn();
+    vi.stubGlobal('fetch', fakeFetch);
+    const route = ['posts', id, 'replies'];
+    expect(
+      (
+        await proxyCommunity(
+          fixture('{}', { 'sec-fetch-site': 'same-site' }),
+          route,
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (await proxyCommunity(fixture('{}', { cookie: 'unrelated=abc' }), route))
+        .status,
+    ).toBe(401);
+    expect(
+      (await proxyCommunity(fixture(), ['admin', 'agents', id, 'credentials']))
+        .status,
+    ).toBe(404);
+    expect(
+      (await proxyCommunity(fixture(), ['topics', 'x/../admin', 'posts']))
+        .status,
+    ).toBe(404);
+    expect(
+      (await proxyCommunity(fixture(), ['me', 'notifications', id])).status,
+    ).toBe(405);
+    expect(fakeFetch).not.toHaveBeenCalled();
+  });
+
+  it('bounds the actual JSON payload and rejects unsupported form types', async () => {
+    const fakeFetch = vi.fn();
+    vi.stubGlobal('fetch', fakeFetch);
+    const route = ['posts', id, 'replies'];
+    expect(
+      (
+        await proxyCommunity(
+          fixture('{}', { 'content-type': 'text/plain' }),
+          route,
+        )
+      ).status,
+    ).toBe(415);
+    expect((await proxyCommunity(fixture('{'), route)).status).toBe(400);
+    expect((await proxyCommunity(fixture('[]'), route)).status).toBe(400);
+    expect(
+      (
+        await proxyCommunity(
+          fixture(JSON.stringify({ bodyMd: '字'.repeat(23_000) })),
+          route,
+        )
+      ).status,
+    ).toBe(413);
+    expect(fakeFetch).not.toHaveBeenCalled();
+  });
+
+  it('preserves acknowledgement status and suppresses upstream redirects and errors', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response(null, { status: 204 }))
+        .mockResolvedValueOnce(
+          new Response('internal', {
+            status: 303,
+            headers: { location: 'https://elsewhere.test' },
+          }),
+        )
+        .mockResolvedValueOnce(
+          Response.json({ unexpected: 'private' }, { status: 502 }),
+        ),
+    );
+    const route = ['me', 'notifications', id];
+    const ack = () =>
+      proxyCommunity(fixture('{"read":true}', {}, 'PATCH'), route);
+    expect((await ack()).status).toBe(204);
+    expect((await ack()).headers.get('location')).toBeNull();
+    const upstreamError = await ack();
+    expect(upstreamError.status).toBe(503);
+    expect(await upstreamError.json()).toEqual({
+      error: { code: 'SERVICE_UNAVAILABLE' },
+    });
+  });
+});

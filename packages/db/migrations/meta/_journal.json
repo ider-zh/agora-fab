@@ -15,6 +15,13 @@
       "when": 1794988369173,
       "tag": "0001_m1_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794989425486,
+      "tag": "0002_m2_community",
+      "breakpoints": true
     }
   ]
 }

@@ -2,12 +2,14 @@ import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   check,
+  foreignKey,
   index,
   jsonb,
   pgTable,
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -234,6 +236,7 @@ export const topics = pgTable(
     kind: text('kind', { enum: ['community', 'project'] }).notNull(),
     title: text('title').notNull(),
     descriptionMd: text('description_md').notNull().default(''),
+    guidelinesMd: text('guidelines_md').notNull().default(''),
     goalMd: text('goal_md'),
     status: text('status', { enum: ['active', 'archived'] })
       .notNull()
@@ -263,8 +266,140 @@ export const topics = pgTable(
       sql`length(trim(${table.title})) between 1 and 200`,
     ),
     check(
+      'topics_guidelines_size_check',
+      sql`length(${table.guidelinesMd}) <= 12000`,
+    ),
+    check(
       'topics_project_goal_check',
       sql`${table.kind} <> 'project' or length(trim(${table.goalMd})) > 0 and ${table.goalMd} is not null`,
+    ),
+  ],
+);
+
+export const postKinds = [
+  'discussion',
+  'idea',
+  'question',
+  'evidence',
+  'proposal',
+  'status',
+] as const;
+
+export const posts = pgTable(
+  'posts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    topicId: uuid('topic_id')
+      .notNull()
+      .references(() => topics.id),
+    parentPostId: uuid('parent_post_id'),
+    ancestorIds: uuid('ancestor_ids')
+      .array()
+      .notNull()
+      .default(sql`'{}'::uuid[]`),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => principals.id),
+    kind: text('kind', { enum: postKinds }).notNull().default('discussion'),
+    bodyMd: text('body_md').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    pinnedAt: timestamp('pinned_at', { withTimezone: true }),
+    hiddenAt: timestamp('hidden_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('posts_id_topic_unique').on(table.id, table.topicId),
+    foreignKey({
+      name: 'posts_parent_topic_fk',
+      columns: [table.parentPostId, table.topicId],
+      foreignColumns: [table.id, table.topicId],
+    }),
+    check(
+      'posts_kind_check',
+      sql`${table.kind} in ('discussion', 'idea', 'question', 'evidence', 'proposal', 'status')`,
+    ),
+    check(
+      'posts_body_check',
+      sql`length(${table.bodyMd}) between 1 and 12000 and ${table.bodyMd} ~ '[^[:space:]]'`,
+    ),
+    check(
+      'posts_ancestors_check',
+      sql`cardinality(${table.ancestorIds}) <= 8
+          and array_position(${table.ancestorIds}, null) is null
+          and not (${table.id} = any(${table.ancestorIds}))
+          and case when ${table.parentPostId} is null
+            then cardinality(${table.ancestorIds}) = 0
+            else cardinality(${table.ancestorIds}) > 0
+              and ${table.ancestorIds}[array_upper(${table.ancestorIds}, 1)] = ${table.parentPostId}
+          end`,
+    ),
+    index('posts_topic_created_idx').on(
+      table.topicId,
+      table.createdAt,
+      table.id,
+    ),
+    index('posts_reply_created_idx').on(
+      table.topicId,
+      table.parentPostId,
+      table.createdAt,
+      table.id,
+    ),
+    index('posts_ancestors_idx').using('gin', table.ancestorIds),
+    index('posts_body_fts_idx').using(
+      'gin',
+      sql`to_tsvector('simple', ${table.bodyMd})`,
+    ),
+  ],
+);
+
+export const mentions = pgTable(
+  'mentions',
+  {
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id),
+    targetPrincipalId: uuid('target_principal_id')
+      .notNull()
+      .references(() => principals.id),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.postId, table.targetPrincipalId] })],
+);
+
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    recipientId: uuid('recipient_id')
+      .notNull()
+      .references(() => principals.id),
+    kind: text('kind', { enum: ['mention'] })
+      .notNull()
+      .default('mention'),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    readAt: timestamp('read_at', { withTimezone: true }),
+  },
+  (table) => [
+    check('notifications_kind_check', sql`${table.kind} = 'mention'`),
+    unique('notifications_post_recipient_unique').on(
+      table.postId,
+      table.recipientId,
+    ),
+    index('notifications_recipient_created_idx').on(
+      table.recipientId,
+      table.createdAt,
+      table.id,
     ),
   ],
 );

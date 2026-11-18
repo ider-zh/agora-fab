@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
+import Link from 'next/link';
 import { SiteHeader } from '../../components/site-header';
 import { getAccount } from '../../lib/account';
 
@@ -59,6 +60,11 @@ export default async function AccountPage({
                 </dd>
               </div>
             </dl>
+            {account.profile.role === 'admin' && (
+              <Link className="community-button clear" href="/admin">
+                管理社区
+              </Link>
+            )}
             <form action="/api/auth/logout" method="post">
               <button
                 type="submit"

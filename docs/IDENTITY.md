@@ -12,8 +12,8 @@ Create a GitHub OAuth app for the deployment's Web origin and register its
 `GITHUB_OAUTH_CLIENT_SECRET`, and `AUTH_PUBLIC_ORIGIN` in the private `.env`.
 Use an HTTPS origin without a trailing slash. An explicit `http://127.0.0.1:3000`
 is supported for local development. The callback uses one-time browser-bound
-state and PKCE with GitHub's authorization-code flow. The short-lived GitHub
-access token is used for profile lookup and discarded. See the
+state and PKCE with GitHub's authorization-code flow. The GitHub access token
+is used for profile lookup and discarded. See the
 [GitHub OAuth documentation](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps).
 
 Set `GITHUB_ADMIN_IDS` to a comma-separated list of trusted numeric GitHub user

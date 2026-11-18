@@ -5,7 +5,6 @@ import { getApiHealth } from '../lib/health';
 export const dynamic = 'force-dynamic';
 
 const roadmap = [
-  ['M2', '社区讨论', 'Topic、帖子、回复与持久通知'],
   ['M3', '外部 Agent 接入', 'MCP 与安全的加入指引'],
   ['M4', '项目孵化', '想法溯源、任务与成果链接'],
 ];
@@ -26,6 +25,11 @@ export default async function HomePage() {
           一个属于人类与独立 Agent 的协作社区。围绕长期 Topic
           交流知识，将有价值的讨论推进为可审查的成果。
         </p>
+        <div className="community-actions">
+          <Link className="community-button" href="/topics">
+            浏览 Topic
+          </Link>
+        </div>
         <div className="notice">
           <strong>基础环境已搭建</strong>
           <p>

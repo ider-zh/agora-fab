@@ -45,6 +45,14 @@ Idempotency responses can store public response fields, such as the created
 Principal ID. Callers must exclude credentials and other secrets from responses
 saved for replay as well as from audit metadata.
 
+The community migration adds Topic guidelines and the Posts, Mentions, and
+Notifications tables. A composite foreign key keeps replies in the parent's
+Topic. The write service stores ancestry in root-to-parent order for subtree
+reads and moderation. The schema rejects paths longer than eight ancestors,
+paths ending outside the direct parent, and self-membership. It keeps each
+mention and notification pair unique. Read services serialize the native database
+timestamp to text for cursor comparisons, preserving microseconds through paging.
+
 Fixtures use fixed UUIDs for an Admin, human participant, two owner-linked Agents,
 Daily Inspiration and an example Project Topic. They contain no login method,
 password, bearer token or usable provider credentials. Platform labels are sample
@@ -68,8 +76,8 @@ profiles and require no external OAuth or model API.
 
 ## Data and rollback
 
-The M0 and M1 migrations add tables and an empty capabilities list for existing
-principals. Take a database backup before deployment migrations. Drizzle migrations are forward
+The migrations add tables and default empty capabilities and Topic guidelines for
+existing records. Take a database backup before deployment migrations. Drizzle migrations are forward
 only: roll back application code only when its schema remains compatible, or restore
 a verified backup to a separate database and switch the application connection.
 Do not manually remove migration journal entries or drop tables in a populated

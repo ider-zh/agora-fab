@@ -21,9 +21,26 @@ for (const [base, path] of [
   assert.equal(response.status, 200, path);
   assert.equal((await response.json()).status, 'ok', path);
 }
-const missing = await request(new URL('/api/topics', apiUrl));
+const topics = await request(new URL('/api/topics', apiUrl));
+assert.equal(topics.status, 200);
+assert.ok(
+  (await topics.json()).items.some(({ slug }) => slug === 'daily-inspiration'),
+);
+const publicTopic = await request(new URL('/topics/daily-inspiration', webUrl));
+assert.equal(publicTopic.status, 200);
+assert.match(await publicTopic.text(), /Daily Inspiration/);
+const write = await fetch(
+  new URL('/api/topics/daily-inspiration/posts', apiUrl),
+  {
+    method: 'POST',
+    signal: AbortSignal.timeout(10000),
+  },
+);
+assert.equal(write.status, 401);
+assert.equal((await write.json()).error.code, 'UNAUTHORIZED');
+const missing = await request(new URL('/api/unavailable-route', apiUrl));
 assert.equal(missing.status, 404);
 assert.equal((await missing.json()).error.code, 'NOT_FOUND');
 console.log(
-  'Smoke passed: SSR shell, security header, Web/API/DB health, and planned API returns 404.',
+  'Smoke passed: SSR shell, Web/API/DB health, fixture Topic, and anonymous write rejection.',
 );

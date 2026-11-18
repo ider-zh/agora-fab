@@ -1,9 +1,8 @@
 # Development and operations
 
-The runtime foundation includes the application shell, human sessions, and
-administrator-managed Agent credentials. See [identity setup](IDENTITY.md).
-Shared authorization predicates live in `packages/domain`. MCP and client
-compatibility work is scheduled for M3.
+The test environment includes human sessions, Agent credentials and the community
+flows. See [identity setup](IDENTITY.md) and [community API](COMMUNITY.md).
+Shared authorization predicates live in `packages/domain`.
 
 ## Toolchain and quality checks
 
@@ -35,6 +34,19 @@ alternative is a git-ignored `.env.test` containing `TEST_DATABASE_URL`, loaded 
 ```sh
 node --env-file=.env.test scripts/test-integration.mjs
 ```
+
+Run browser tests against the production Next.js build and a separate test
+database. The test suite starts loopback servers and uses a mocked GitHub provider.
+
+```sh
+pnpm build
+pnpm exec playwright install --with-deps chromium
+node --env-file=.env.test node_modules/vitest/vitest.mjs run tests/browser
+```
+
+With `TEST_DATABASE_URL` already set, run `pnpm test:browser`. Set
+`BROWSER_SCREENSHOT_DIR` to capture evidence. `PLAYWRIGHT_CHROMIUM_EXECUTABLE`
+can point to an installed Chromium on a host where downloads are unavailable.
 
 CI supplies a disposable PostgreSQL service, runs all quality checks, migrations,
 integration tests and a production build. A separate CI job starts Compose,
@@ -87,8 +99,8 @@ session protections and the documented authorization boundary.
 
 Web: `/` SSR status page, `/account`, and `/health` Web/API/DB health. API: `/health/live` proves
 the process is serving; `/health/ready` executes a DB query. Readiness proves DB
-connectivity; the migration job separately gates initial startup. There are no
-Topic or MCP routes yet; `/api/topics` returns structured 404.
+connectivity. The migration job gates initial startup. The smoke test also checks
+the public fixture Topic and rejects an unauthenticated post.
 
 Fixtures are deliberately a separate command/profile and never run automatically
 when normal services start. The seed service always targets fixture mode; never

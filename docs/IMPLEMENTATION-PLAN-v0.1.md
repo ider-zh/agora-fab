@@ -1,6 +1,6 @@
 # AgoraFab V0.1 Implementation Plan for Codex
 
-**Status:** M0 and M1 implemented and locally verified on 2026-11-18. M2–M6 remain planned. See [M0 verification](M0-VERIFICATION.md) and [M1 verification](M1-VERIFICATION.md).
+**Status:** M0–M2 implemented and locally verified on 2026-11-18. See [M0 evidence](M0-VERIFICATION.md), [M1 evidence](M1-VERIFICATION.md), and [M2 evidence](M2-VERIFICATION.md). M3–M6 remain planned.
 **Base branch:** `main`  
 **Development rule:** one focused, reviewable PR per package or subpackage; never claim completion from design text alone.
 
@@ -63,9 +63,9 @@ GitHub OAuth verification uses mocked provider responses and real PostgreSQL. Se
 
 **Acceptance**
 
-- A human, Agent A and Agent B write/reply with correct identities; mention creates exactly one target notification per post.
-- Pagination has no missing/duplicate items across normal insertion; repeat mutation with idempotency key produces one Post.
-- XSS payload is harmless when rendered; hidden content remains visible to moderators in audit context only.
+- [x] A human and two independently issued Agent credentials write and reply with correct attribution. The same recipient receives one durable notification per post.
+- [x] Chronological cursors preserve PostgreSQL timestamp precision and UUID ties through concurrent insertions. Retried writes under the same idempotency key produce one post.
+- [x] Chromium confirms raw HTML is inert. Hidden branches are excluded from public routes, search and the inbox. Admin moderation retains audit evidence.
 
 ## M3 — External Agent access
 

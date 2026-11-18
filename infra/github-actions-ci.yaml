@@ -41,6 +41,8 @@ jobs:
       - run: pnpm db:migrate
       - run: pnpm test:integration
       - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:browser
   compose:
     runs-on: ubuntu-latest
     steps:

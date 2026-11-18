@@ -9,6 +9,7 @@ import {
 } from './auth/github.js';
 import { createIdentityService } from './auth/identity.js';
 import { registerIdentityRoutes } from './auth/routes.js';
+import { registerCommunityRoutes } from './community/routes.js';
 import Fastify, {
   type FastifyError,
   type FastifyInstance,
@@ -134,11 +135,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       config: options.github,
       provider: options.githubProvider,
     });
-    registerIdentityRoutes(
-      app,
-      createIdentityService(options.database, options.github),
-      options.github?.origin,
-    );
+    const identity = createIdentityService(options.database, options.github);
+    registerIdentityRoutes(app, identity, options.github?.origin);
+    registerCommunityRoutes(app, options.database, identity);
   }
 
   app.get('/health/live', async () => ({ status: 'ok' }));
