@@ -1,6 +1,6 @@
 # AgoraFab V0.1 Implementation Plan for Codex
 
-**Status:** all work packages below are planned and **not implemented** at the time of this document.  
+**Status:** M0 implemented and locally verified on 2026-11-18; M1–M6 remain **not implemented**. Evidence: [M0 verification](M0-VERIFICATION.md). CI configuration is included; remote CI results are reported separately in the PR.
 **Base branch:** `main`  
 **Development rule:** one focused, reviewable PR per package or subpackage; never claim completion from design text alone.
 
@@ -27,11 +27,13 @@ Do not start M4 before M1/M2 permission and discussion flows are stable. M3 can 
 - Define health endpoints, config schema and structured error format. Establish CI using no external paid API.
 - Document `pnpm install`, migrations, seed, local start, test and shutdown.
 
-**Acceptance**
+**Acceptance — verified (M0 only)**
 
-- Fresh clone starts from documented commands with no secret keys required for local fixture mode.
-- `format:check`, `lint`, `typecheck`, `test`, `db:migrate` and `docker compose up --build` pass.
-- No database credentials or tokens are committed; startup fails clearly for invalid config.
+- [x] Clean dependency installation and container builds start the documented fixture environment without vendor secret keys. `.env` gets a generated local database password.
+- [x] `format:check`, `lint`, `typecheck`, `test`, `build`, `db:migrate`, real PostgreSQL integration tests, Compose builds/startup and LAN HTTP smoke checks pass. The tested host uses a documented local network override for builds.
+- [x] No deployment database credentials or tokens are committed; API startup rejects invalid config without echoing values. CI uses disposable fixture credentials only.
+
+See [commands, results and limitations](M0-VERIFICATION.md). This does not certify M1 authentication or a production deployment.
 
 ## M1 — Identity and permission boundary
 
@@ -129,9 +131,9 @@ Do not start M4 before M1/M2 permission and discussion flows are stable. M3 can 
 4. **Independent review:** code author and PR reviewer should be different when possible, particularly for auth and task lifecycle changes.
 5. **Small PRs:** note decisions, migrations, commands/test evidence and remaining work. Do not merge or deploy production without owner authorization.
 
-## Suggested first Codex task
+## Suggested next Codex task
 
-> Read `AGENTS.md` and all V0.1 documents. Verify this empty/spec-only repository, create a feature branch for **M0**, initialize the minimum TypeScript/Next.js/Fastify/PostgreSQL/Drizzle monorepo with Docker Compose and CI, run all available tests, then open a PR. Do not implement M1+ features or deploy. Summarize commands, evidence and architectural decisions in the PR.
+> Read `AGENTS.md` and all V0.1 documents, inspect the M0 PR and current repository state, then implement the next incomplete M1 subpackage in a feature branch. Preserve the M0 environment and shared authorization boundary. Use mocked OAuth in CI; arrange legitimate deployment credentials separately when real sign-in is tested. Do not claim Agent-client compatibility from fixture metadata. Keep the PR focused, run all relevant checks, record evidence and do not auto-merge.
 
 ## Future roadmap (not part of acceptance)
 

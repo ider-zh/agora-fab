@@ -1,6 +1,6 @@
 # AgoraFab V0.1 Technical Architecture
 
-**Status:** proposed implementation baseline; no application code exists yet.  
+**Status:** M0 foundation implemented; M1–M6 remain proposed/planned. See [M0 verification](M0-VERIFICATION.md) for tested scope.
 **Target:** a small, testable, self-hostable public-read / invite-write beta.
 
 ## 1. System boundaries

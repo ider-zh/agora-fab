@@ -1,0 +1,257 @@
+{
+  "id": "b73af40f-bca3-4cf0-bf1b-c69534137280",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.principals": {
+      "name": "principals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "handle": {
+          "name": "handle",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'participant'"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "owner_principal_id": {
+          "name": "owner_principal_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "principals_owner_principal_id_principals_id_fk": {
+          "name": "principals_owner_principal_id_principals_id_fk",
+          "tableFrom": "principals",
+          "tableTo": "principals",
+          "columnsFrom": ["owner_principal_id"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "principals_handle_unique": {
+          "name": "principals_handle_unique",
+          "nullsNotDistinct": false,
+          "columns": ["handle"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "principals_kind_check": {
+          "name": "principals_kind_check",
+          "value": "\"principals\".\"kind\" in ('human', 'agent')"
+        },
+        "principals_role_check": {
+          "name": "principals_role_check",
+          "value": "\"principals\".\"role\" in ('participant', 'admin')"
+        },
+        "principals_status_check": {
+          "name": "principals_status_check",
+          "value": "\"principals\".\"status\" in ('active', 'revoked')"
+        },
+        "principals_human_admin_check": {
+          "name": "principals_human_admin_check",
+          "value": "\"principals\".\"role\" <> 'admin' or \"principals\".\"kind\" = 'human'"
+        },
+        "principals_handle_normalized_check": {
+          "name": "principals_handle_normalized_check",
+          "value": "\"principals\".\"handle\" ~ '^[a-z][a-z0-9_]{2,31}$'"
+        },
+        "principals_display_name_check": {
+          "name": "principals_display_name_check",
+          "value": "length(trim(\"principals\".\"display_name\")) between 1 and 120"
+        },
+        "principals_owner_check": {
+          "name": "principals_owner_check",
+          "value": "(\"principals\".\"kind\" = 'human' and \"principals\".\"owner_principal_id\" is null) or (\"principals\".\"kind\" = 'agent' and \"principals\".\"owner_principal_id\" is not null and \"principals\".\"owner_principal_id\" <> \"principals\".\"id\")"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.topics": {
+      "name": "topics",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description_md": {
+          "name": "description_md",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "goal_md": {
+          "name": "goal_md",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "topics_created_by_principals_id_fk": {
+          "name": "topics_created_by_principals_id_fk",
+          "tableFrom": "topics",
+          "tableTo": "principals",
+          "columnsFrom": ["created_by"],
+          "columnsTo": ["id"],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "topics_slug_unique": {
+          "name": "topics_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": ["slug"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "topics_kind_check": {
+          "name": "topics_kind_check",
+          "value": "\"topics\".\"kind\" in ('community', 'project')"
+        },
+        "topics_status_check": {
+          "name": "topics_status_check",
+          "value": "\"topics\".\"status\" in ('active', 'archived')"
+        },
+        "topics_slug_check": {
+          "name": "topics_slug_check",
+          "value": "length(\"topics\".\"slug\") <= 100 and \"topics\".\"slug\" ~ '^[a-z0-9]+(-[a-z0-9]+)*$'"
+        },
+        "topics_title_check": {
+          "name": "topics_title_check",
+          "value": "length(trim(\"topics\".\"title\")) between 1 and 200"
+        },
+        "topics_project_goal_check": {
+          "name": "topics_project_goal_check",
+          "value": "\"topics\".\"kind\" <> 'project' or length(trim(\"topics\".\"goal_md\")) > 0 and \"topics\".\"goal_md\" is not null"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

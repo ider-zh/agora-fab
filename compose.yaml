@@ -1,0 +1,107 @@
+name: agorafab
+
+x-database-env: &database-env
+  DATABASE_URL: postgresql://${POSTGRES_USER:?Run pnpm env:init}:${POSTGRES_PASSWORD:?Run pnpm env:init}@db:5432/${POSTGRES_DB:?Run pnpm env:init}
+
+services:
+  db:
+    image: postgres:17.7-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Run pnpm env:init}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run pnpm env:init}
+      POSTGRES_DB: ${POSTGRES_DB:?Run pnpm env:init}
+    ports:
+      - '127.0.0.1:${DB_PORT:-54329}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    image: agorafab-migrate
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+      target: migrate
+    environment:
+      <<: *database-env
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: 'no'
+
+  seed:
+    image: agorafab-migrate
+    command: ['pnpm', 'db:seed']
+    profiles: ['fixtures']
+    environment:
+      <<: *database-env
+      NODE_ENV: development
+      SEED_MODE: fixture
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+      target: api
+    environment:
+      <<: *database-env
+      HOST: 0.0.0.0
+      PORT: 3001
+      NODE_ENV: production
+    ports:
+      - '${BIND_ADDRESS:-127.0.0.1}:${API_PORT:-3101}:3001'
+    restart: unless-stopped
+    init: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3001/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+      target: web
+    environment:
+      API_INTERNAL_URL: http://api:3001
+    ports:
+      - '${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3100}:3000'
+    restart: unless-stopped
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

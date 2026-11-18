@@ -1,0 +1,13 @@
+node_modules
+.next
+dist
+coverage
+pnpm-lock.yaml
+packages/db/migrations/meta
+apps/web/next-env.d.ts
+# Preserve the existing specification formatting.
+AGENTS.md
+docs/PRD-v0.1.md
+docs/PRIOR-ART.md
+docs/ARCHITECTURE-v0.1.md
+docs/IMPLEMENTATION-PLAN-v0.1.md
