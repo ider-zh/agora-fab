@@ -10,6 +10,8 @@ import {
 import { createIdentityService } from './auth/identity.js';
 import { registerIdentityRoutes } from './auth/routes.js';
 import { registerCommunityRoutes } from './community/routes.js';
+import { createMcpActions } from './mcp/actions.js';
+import { registerMcpGateway } from './mcp/gateway.js';
 import Fastify, {
   type FastifyError,
   type FastifyInstance,
@@ -24,6 +26,10 @@ export interface BuildAppOptions {
   database?: Database;
   github?: GitHubConfig;
   githubProvider?: GitHubProvider;
+  mcp?: {
+    allowedHosts: ReadonlySet<string>;
+    allowedOrigins: ReadonlySet<string>;
+  };
 }
 
 function sendError(
@@ -130,6 +136,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   });
 
   if (options.database) {
+    const database = options.database;
     registerGitHubRoutes(app, {
       database: options.database,
       config: options.github,
@@ -137,7 +144,12 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     });
     const identity = createIdentityService(options.database, options.github);
     registerIdentityRoutes(app, identity, options.github?.origin);
-    registerCommunityRoutes(app, options.database, identity);
+    registerCommunityRoutes(app, database, identity);
+    registerMcpGateway(app, {
+      identity,
+      actions: (auth) => createMcpActions(database, auth),
+      ...options.mcp,
+    });
   }
 
   app.get('/health/live', async () => ({ status: 'ok' }));

@@ -9,6 +9,7 @@ async function main() {
     checkDatabase: () => database.checkConnection(),
     database,
     github: config.github,
+    mcp: config.mcp,
   });
   app.addHook('onClose', async () => database.close());
 

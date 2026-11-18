@@ -7,6 +7,10 @@ export interface ApiConfig {
   port: number;
   nodeEnv: 'development' | 'test' | 'production';
   github?: GitHubConfig;
+  mcp?: {
+    allowedHosts: ReadonlySet<string>;
+    allowedOrigins: ReadonlySet<string>;
+  };
 }
 
 export class ConfigurationError extends Error {
@@ -94,6 +98,43 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
       fields.push('AUTH_PUBLIC_ORIGIN');
     }
   }
+  const allowedHosts = new Set<string>();
+  const allowedOrigins = new Set<string>();
+  if (env.MCP_PUBLIC_URL) {
+    try {
+      const endpoint = new URL(env.MCP_PUBLIC_URL);
+      if (
+        !['http:', 'https:'].includes(endpoint.protocol) ||
+        !endpoint.pathname.endsWith('/mcp') ||
+        endpoint.username ||
+        endpoint.password ||
+        endpoint.search ||
+        endpoint.hash ||
+        endpoint.href !== env.MCP_PUBLIC_URL
+      )
+        throw new Error();
+      allowedHosts.add(endpoint.host);
+    } catch {
+      fields.push('MCP_PUBLIC_URL');
+    }
+  }
+  for (const entry of (env.MCP_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)) {
+    try {
+      const origin = new URL(entry);
+      if (
+        !['http:', 'https:'].includes(origin.protocol) ||
+        entry !== origin.origin
+      )
+        throw new Error();
+      allowedOrigins.add(entry);
+    } catch {
+      fields.push('MCP_ALLOWED_ORIGINS');
+      break;
+    }
+  }
   if (fields.length > 0) {
     throw new ConfigurationError(fields);
   }
@@ -103,6 +144,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     host,
     port,
     nodeEnv: nodeEnv as ApiConfig['nodeEnv'],
+    ...(allowedHosts.size || allowedOrigins.size
+      ? { mcp: { allowedHosts, allowedOrigins } }
+      : {}),
     ...(clientId && clientSecret && origin
       ? { github: { clientId, clientSecret, origin, adminIds } }
       : {}),

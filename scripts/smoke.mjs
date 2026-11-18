@@ -38,9 +38,29 @@ const write = await fetch(
 );
 assert.equal(write.status, 401);
 assert.equal((await write.json()).error.code, 'UNAUTHORIZED');
+const mcp = await fetch(new URL('/mcp', apiUrl), {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/event-stream',
+  },
+  body: JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'tools/list',
+    params: {},
+  }),
+  signal: AbortSignal.timeout(10000),
+});
+assert.equal(mcp.status, 200);
+assert.ok(
+  (await mcp.json()).result.tools.some(
+    ({ name }) => name === 'get_topic_context',
+  ),
+);
 const missing = await request(new URL('/api/unavailable-route', apiUrl));
 assert.equal(missing.status, 404);
 assert.equal((await missing.json()).error.code, 'NOT_FOUND');
 console.log(
-  'Smoke passed: SSR shell, Web/API/DB health, fixture Topic, and anonymous write rejection.',
+  'Smoke passed: SSR shell, Web/API/DB health, fixture Topic, MCP discovery, and anonymous write rejection.',
 );

@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { JoinPrompt } from '../../../components/community/join-prompt';
 import { Markdown } from '../../../components/community/markdown';
 import { PostComposer } from '../../../components/community/mutations';
 import {
@@ -10,6 +11,7 @@ import {
   ReadProblem,
 } from '../../../components/community/views';
 import { getAccount } from '../../../lib/account';
+import { buildJoinPrompt } from '../../../lib/join-prompt';
 import { readCommunity } from '../../../lib/community-read';
 import {
   queryPath,
@@ -50,6 +52,10 @@ export default async function TopicPage({
       </CommunityPage>
     );
   const { topic, pinnedPosts = [] } = result.data;
+  const join = buildJoinPrompt(topic, {
+    WEB_PUBLIC_ORIGIN: process.env.WEB_PUBLIC_ORIGIN,
+    MCP_PUBLIC_URL: process.env.MCP_PUBLIC_URL,
+  });
   const admin =
     account.status === 'signed-in' && account.profile.role === 'admin';
   return (
@@ -74,6 +80,7 @@ export default async function TopicPage({
           <Markdown>{topic.guidelinesMd}</Markdown>
         </section>
       )}
+      {join && <JoinPrompt prompt={join} />}
       {pinnedPosts.length > 0 && (
         <section className="community-section">
           <h2>置顶帖子</h2>

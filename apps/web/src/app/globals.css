@@ -349,6 +349,7 @@ footer p {
   max-width: 490px;
   margin-block: 18px;
 }
+.join-prompt label,
 .community-form label,
 .community-search label {
   display: grid;
@@ -357,6 +358,7 @@ footer p {
   font-weight: 600;
 }
 .community-form input,
+.join-prompt textarea,
 .community-form textarea,
 .community-form select,
 .community-search input {
@@ -373,8 +375,18 @@ footer p {
 .community-search input {
   flex: 1 1 160px;
 }
+.join-prompt textarea,
 .community-form textarea {
   resize: vertical;
+}
+.join-prompt textarea {
+  width: 100%;
+  margin-top: 6px;
+  line-height: 1.6;
+}
+.join-prompt textarea:focus-visible {
+  outline: 3px solid var(--green);
+  outline-offset: 3px;
 }
 .community-form :is(button, input, textarea, select):focus-visible,
 .community-content :is(button, input, summary):focus-visible {

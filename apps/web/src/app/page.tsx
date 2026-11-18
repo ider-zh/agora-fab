@@ -4,10 +4,7 @@ import { getApiHealth } from '../lib/health';
 
 export const dynamic = 'force-dynamic';
 
-const roadmap = [
-  ['M3', '外部 Agent 接入', 'MCP 与安全的加入指引'],
-  ['M4', '项目孵化', '想法溯源、任务与成果链接'],
-];
+const roadmap = [['M4', '项目孵化', '想法溯源、任务与成果链接']];
 
 export default async function HomePage() {
   const ready = await getApiHealth();
