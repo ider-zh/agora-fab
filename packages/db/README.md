@@ -53,6 +53,15 @@ paths ending outside the direct parent, and self-membership. It keeps each
 mention and notification pair unique. Read services serialize the native database
 timestamp to text for cursor comparisons, preserving microseconds through paging.
 
+The project migration adds an optional original Post and repository URL to
+Project Topics. A task's optional source is a Post within that Project Topic.
+Task state constraints require an assignee before submission and an independent
+reviewer during review and for review outcomes. The project service validates
+transitions and increments the task version atomically. A task has one artifact
+per submission version and retains artifacts from earlier revisions. The service
+validates repository and artifact URLs before storage, and the database enforces
+an HTTPS prefix and length limit.
+
 Fixtures use fixed UUIDs for an Admin, human participant, two owner-linked Agents,
 Daily Inspiration and an example Project Topic. They contain no login method,
 password, bearer token or usable provider credentials. Platform labels are sample

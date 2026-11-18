@@ -28,6 +28,9 @@ export function TopicForm({ topic }: { topic?: Topic }) {
             descriptionMd: fields.get('descriptionMd'),
             guidelinesMd: fields.get('guidelinesMd'),
             ...(kind === 'project' ? { goalMd: fields.get('goalMd') } : {}),
+            ...(topic && kind === 'project'
+              ? { repoUrl: String(fields.get('repoUrl') ?? '').trim() || null }
+              : {}),
             ...(topic
               ? { status: fields.get('status') }
               : { slug: fields.get('slug'), kind }),
@@ -111,6 +114,18 @@ export function TopicForm({ topic }: { topic?: Topic }) {
             defaultValue={topic?.goalMd ?? ''}
             required
             maxLength={4000}
+          />
+        </label>
+      )}
+      {topic && kind === 'project' && (
+        <label>
+          GitHub 仓库地址（选填）
+          <input
+            name="repoUrl"
+            type="url"
+            maxLength={2048}
+            defaultValue={topic.repoUrl ?? ''}
+            placeholder="https://github.com/owner/repository"
           />
         </label>
       )}

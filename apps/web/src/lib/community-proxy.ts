@@ -33,17 +33,28 @@ function mutationFor(segments: readonly string[]) {
       return 'PATCH';
     if (first === 'admin' && second === 'topics' && uuid.test(third ?? ''))
       return 'PATCH';
+    if (first === 'projects' && uuid.test(second) && third === 'tasks')
+      return 'POST';
+    if (
+      first === 'tasks' &&
+      uuid.test(second) &&
+      ['claim', 'artifacts', 'review'].includes(third ?? '')
+    )
+      return 'POST';
+    if (first === 'admin' && second === 'tasks' && uuid.test(third ?? ''))
+      return 'PATCH';
   }
   if (segments.length === 2 && first === 'admin' && second === 'topics')
     return 'POST';
-  if (
-    segments.length === 4 &&
-    first === 'admin' &&
-    second === 'posts' &&
-    uuid.test(third ?? '') &&
-    ['hide', 'restore', 'pin', 'unpin'].includes(fourth ?? '')
-  )
-    return 'POST';
+  if (segments.length === 4 && first === 'admin' && uuid.test(third ?? '')) {
+    if (
+      second === 'posts' &&
+      ['hide', 'restore', 'pin', 'unpin', 'promote'].includes(fourth ?? '')
+    )
+      return 'POST';
+    if (second === 'projects' && fourth === 'tasks') return 'POST';
+    if (second === 'tasks' && fourth === 'review') return 'POST';
+  }
 }
 
 async function readBody(request: Request): Promise<string | null> {

@@ -29,6 +29,8 @@ const topicColumns = {
   descriptionMd: topics.descriptionMd,
   guidelinesMd: topics.guidelinesMd,
   goalMd: topics.goalMd,
+  originPostId: topics.originPostId,
+  repoUrl: topics.repoUrl,
   status: topics.status,
   createdAt: cursorTimestamp(topics.createdAt),
   updatedAt: cursorTimestamp(topics.updatedAt),

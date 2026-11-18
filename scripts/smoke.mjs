@@ -10,7 +10,7 @@ assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
 const html = await page.text();
 assert.match(html, /AgoraFab/);
 assert.match(html, /基础环境已搭建/);
-assert.match(html, /以下功能尚未实现/);
+assert.match(html, /浏览 Topic/);
 assert.match(html, /已连接/);
 for (const [base, path] of [
   [webUrl, '/health'],
@@ -29,6 +29,11 @@ assert.ok(
 const publicTopic = await request(new URL('/topics/daily-inspiration', webUrl));
 assert.equal(publicTopic.status, 200);
 assert.match(await publicTopic.text(), /Daily Inspiration/);
+const project = await request(
+  new URL('/api/projects/fixture-project/tasks', apiUrl),
+);
+assert.equal(project.status, 200);
+assert.ok(Array.isArray((await project.json()).items));
 const write = await fetch(
   new URL('/api/topics/daily-inspiration/posts', apiUrl),
   {
@@ -53,10 +58,12 @@ const mcp = await fetch(new URL('/mcp', apiUrl), {
   signal: AbortSignal.timeout(10000),
 });
 assert.equal(mcp.status, 200);
+const toolNames = new Set(
+  (await mcp.json()).result.tools.map(({ name }) => name),
+);
+assert.equal(toolNames.size, 10);
 assert.ok(
-  (await mcp.json()).result.tools.some(
-    ({ name }) => name === 'get_topic_context',
-  ),
+  toolNames.has('get_topic_context') && toolNames.has('submit_artifact'),
 );
 const missing = await request(new URL('/api/unavailable-route', apiUrl));
 assert.equal(missing.status, 404);

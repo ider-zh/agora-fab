@@ -4,6 +4,8 @@ import * as schema from './schema.js';
 
 export {
   agentCredentials,
+  artifactKinds,
+  artifacts,
   auditEvents,
   githubIdentities,
   idempotencyRecords,
@@ -14,6 +16,8 @@ export {
   posts,
   principals,
   sessions,
+  tasks,
+  taskStatuses,
   topics,
 } from './schema.js';
 export { GitHubSignInError, signInGitHub } from './sign-in.js';

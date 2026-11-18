@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { JoinPrompt } from '../../../components/community/join-prompt';
 import { Markdown } from '../../../components/community/markdown';
 import { PostComposer } from '../../../components/community/mutations';
+import { ProjectTasks } from '../../../components/community/project-tasks';
 import {
   CommunityPage,
   Pager,
@@ -27,9 +28,12 @@ export default async function TopicPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ cursor?: string | string[] }>;
+  searchParams: Promise<{
+    cursor?: string | string[];
+    taskCursor?: string | string[];
+  }>;
 }) {
-  const [{ slug }, { cursor }, requestHeaders] = await Promise.all([
+  const [{ slug }, { cursor, taskCursor }, requestHeaders] = await Promise.all([
     params,
     searchParams,
     headers(),
@@ -81,6 +85,15 @@ export default async function TopicPage({
         </section>
       )}
       {join && <JoinPrompt prompt={join} />}
+      {topic.kind === 'project' && (
+        <ProjectTasks
+          topic={topic}
+          taskCursor={taskCursor}
+          cursor={typeof cursor === 'string' ? cursor : undefined}
+          admin={admin}
+          signedIn={account.status === 'signed-in'}
+        />
+      )}
       {pinnedPosts.length > 0 && (
         <section className="community-section">
           <h2>置顶帖子</h2>
@@ -117,10 +130,21 @@ export default async function TopicPage({
               <p className="community-message">暂无帖子。</p>
             )}
             <Pager
-              first={cursor ? path : undefined}
+              first={
+                cursor
+                  ? queryPath(path, {
+                      taskCursor:
+                        typeof taskCursor === 'string' ? taskCursor : undefined,
+                    })
+                  : undefined
+              }
               next={
                 posts.data.nextCursor &&
-                queryPath(path, { cursor: posts.data.nextCursor })
+                queryPath(path, {
+                  cursor: posts.data.nextCursor,
+                  taskCursor:
+                    typeof taskCursor === 'string' ? taskCursor : undefined,
+                })
               }
             />
           </>

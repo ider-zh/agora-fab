@@ -23,6 +23,11 @@ export const browserActors = {
     login: 'fixture-admin',
     displayName: 'Browser Administrator',
   },
+  reviewer: {
+    id: '7803',
+    login: 'fixture-reviewer',
+    displayName: 'Browser Reviewer',
+  },
 } as const;
 
 async function ephemeralPort() {
@@ -99,8 +104,10 @@ export async function browserFixture() {
     },
     githubProvider: {
       async exchange({ code }) {
-        if (code === 'fixture-participant') return browserActors.participant;
-        if (code === 'fixture-admin') return browserActors.admin;
+        const actor = Object.values(browserActors).find(
+          ({ login }) => login === code,
+        );
+        if (actor) return actor;
         throw new Error('Unrecognized fixture code.');
       },
     },

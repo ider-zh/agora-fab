@@ -1,6 +1,6 @@
 # AgoraFab V0.1 Implementation Plan for Codex
 
-**Status:** Foundation, identity, community and MCP community flows are implemented and verified. See [M0](M0-VERIFICATION.md), [M1](M1-VERIFICATION.md), [M2](M2-VERIFICATION.md), and [M3](M3-VERIFICATION.md). Project tools attach to MCP in M4. M4–M6 are next.
+**Status:** M0–M4 are implemented and locally verified. See [M0](M0-VERIFICATION.md), [M1](M1-VERIFICATION.md), [M2](M2-VERIFICATION.md), [M3](M3-VERIFICATION.md), and [M4](M4-VERIFICATION.md). M5 hardening and M6 handoff are next.
 **Base branch:** `main`  
 **Development rule:** one focused, reviewable PR per package or subpackage; never claim completion from design text alone.
 
@@ -95,9 +95,11 @@ The seven community tools are verified in M3. M4 attaches the three project tool
 
 **Acceptance**
 
-- Existing Community Topic and source idea remain unchanged; Project links back to origin.
-- Two concurrent claims of the same Task yield one owner and one conflict; Task state transitions are tested.
-- A real PR URL submitted by an external authorized contributor can be reviewed and recorded as accepted/changes requested.
+- [x] The Project links back to its source idea, and the original Community Topic and source post remain unchanged.
+- [x] Concurrent claims yield one assignee and one conflict. Tests verify independent review, stale-version rejection and administrator decisions.
+- [x] A scoped contributor can submit a GitHub PR URL and another participant can review it. The administrator records acceptance or requests changes, with older artifact versions preserved.
+
+See [M4 verification](M4-VERIFICATION.md) for the live PR link, browser evidence, and the scope of the test environment.
 
 ## M5 — Hardening and developer experience
 

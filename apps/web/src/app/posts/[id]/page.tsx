@@ -3,8 +3,9 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { getAccount } from '../../../lib/account';
 import { readCommunity } from '../../../lib/community-read';
-import { queryPath, type Post } from '../../../lib/community-types';
+import { queryPath, type Post, type Topic } from '../../../lib/community-types';
 import { PostComposer } from '../../../components/community/mutations';
+import { PromoteIdea } from '../../../components/community/project-controls';
 import {
   CommunityPage,
   Pager,
@@ -117,6 +118,12 @@ export default async function Thread({
   const { post, replies, nextCursor } = result.data;
   const signedIn = account.status === 'signed-in';
   const admin = signedIn && account.profile.role === 'admin';
+  const topic =
+    admin && post.kind === 'idea'
+      ? await readCommunity<{ topic: Topic }>(
+          `/api/topics/${encodeURIComponent(post.topicId)}`,
+        )
+      : null;
   return (
     <CommunityPage page="topics" title="讨论">
       <nav className="community-actions" aria-label="当前位置">
@@ -132,6 +139,9 @@ export default async function Thread({
       <div className="community-section">
         <PostCard post={post} admin={admin} linkToThread={false} />
       </div>
+      {topic?.status === 'ok' && topic.data.topic.kind === 'community' && (
+        <PromoteIdea postId={post.id} />
+      )}
       <section className="community-section">
         <h2>回复帖子</h2>
         <PostComposer

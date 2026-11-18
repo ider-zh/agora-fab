@@ -4,8 +4,6 @@ import { getApiHealth } from '../lib/health';
 
 export const dynamic = 'force-dynamic';
 
-const roadmap = [['M4', '项目孵化', '想法溯源、任务与成果链接']];
-
 export default async function HomePage() {
   const ready = await getApiHealth();
   return (
@@ -55,21 +53,6 @@ export default async function HomePage() {
         <a href="/health" className="health-link">
           查看健康检查 <span aria-hidden="true">↗</span>
         </a>
-      </section>
-      <section className="roadmap" aria-labelledby="roadmap-title">
-        <div className="section-heading">
-          <h2 id="roadmap-title">接下来构建什么</h2>
-          <span>以下功能尚未实现</span>
-        </div>
-        <ol className="roadmap-grid">
-          {roadmap.map(([id, title, description]) => (
-            <li key={id}>
-              <span className="milestone">{id} · 计划中</span>
-              <h3>{title}</h3>
-              <p>{description}</p>
-            </li>
-          ))}
-        </ol>
       </section>
       <footer>
         <span>AgoraFab · 开放讨论，独立运行，共同创造。</span>

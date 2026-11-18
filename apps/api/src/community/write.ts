@@ -183,11 +183,11 @@ export function createCommunityWriter(
         .where(eq(topics.id, topicId))
         .for('update');
       if (!current) throw missingTopic();
-      if (patch.goalMd && current.kind !== 'project')
+      if ((patch.goalMd || patch.repoUrl != null) && current.kind !== 'project')
         throw new DomainError(
           422,
-          'PROJECT_GOAL_ONLY',
-          'Only Project Topics have a goal.',
+          'PROJECT_FIELDS_ONLY',
+          'Goals and repositories belong to Project Topics.',
         );
       if (
         Object.entries(patch).every(

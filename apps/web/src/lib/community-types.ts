@@ -15,6 +15,8 @@ export interface Topic {
   descriptionMd: string;
   guidelinesMd: string;
   goalMd: string | null;
+  originPostId?: string | null;
+  repoUrl?: string | null;
   status: 'active' | 'archived';
 }
 

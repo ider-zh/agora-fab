@@ -26,6 +26,38 @@ function fixture(body = '{}', extra: HeadersInit = {}, method = 'POST') {
 }
 
 describe('community browser mutation boundary', () => {
+  it('permits only known project writes with the matching method', async () => {
+    const fakeFetch = vi
+      .fn()
+      .mockImplementation(() => Response.json({ task: { id } }));
+    vi.stubGlobal('fetch', fakeFetch);
+    for (const [method, route] of [
+      ['POST', ['projects', id, 'tasks']],
+      ['POST', ['tasks', id, 'claim']],
+      ['POST', ['tasks', id, 'artifacts']],
+      ['POST', ['tasks', id, 'review']],
+      ['POST', ['admin', 'posts', id, 'promote']],
+      ['POST', ['admin', 'projects', id, 'tasks']],
+      ['POST', ['admin', 'tasks', id, 'review']],
+      ['PATCH', ['admin', 'tasks', id]],
+    ] as const) {
+      expect(
+        (await proxyCommunity(fixture('{}', {}, method), [...route])).status,
+      ).toBe(200);
+    }
+    expect(
+      (await proxyCommunity(fixture(), ['admin', 'tasks', id, 'artifacts']))
+        .status,
+    ).toBe(404);
+    expect(
+      (await proxyCommunity(fixture(), ['projects', 'bad/id', 'tasks'])).status,
+    ).toBe(404);
+    expect(
+      (await proxyCommunity(fixture(), ['admin', 'tasks', id])).status,
+    ).toBe(405);
+    expect(fakeFetch).toHaveBeenCalledTimes(8);
+  });
+
   it('only forwards approved mutable routes and the fields required by Fastify', async () => {
     vi.stubEnv('API_INTERNAL_URL', 'http://api.example.test:3001');
     const fakeFetch = vi

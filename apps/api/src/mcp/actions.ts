@@ -6,6 +6,7 @@ import { postInput } from '../community/input.js';
 import { createCommunityReader } from '../community/read.js';
 import { createCommunityWriter } from '../community/write.js';
 import { uuid } from '../http-validation.js';
+import { createTaskService, submitArtifactInput } from '../projects/tasks.js';
 
 const maxContextBytes = 32_768;
 const maxContextPage = 8;
@@ -50,7 +51,7 @@ function previewPost(post: Post) {
 export function createMcpActions(
   database: Database,
   identity: AuthContext | null,
-  projects?: McpActions['projects'],
+  tasks?: ReturnType<typeof createTaskService>,
 ): McpActions {
   const reader = createCommunityReader(database);
   const writer = createCommunityWriter(database, reader);
@@ -66,8 +67,8 @@ export function createMcpActions(
           cursor,
           limit: Math.min(limit ?? maxContextPage, maxContextPage),
         }),
-        topic.kind === 'project' && projects
-          ? projects.list_tasks({ topicId: topic.id, limit: 6 })
+        topic.kind === 'project' && tasks
+          ? tasks.listTasks(topic.id, { limit: 6, status: 'open' })
           : undefined,
       ]);
       const { descriptionMd, guidelinesMd, goalMd, ...metadata } = topic;
@@ -153,6 +154,31 @@ export function createMcpActions(
     },
     get_notifications: (options) =>
       inbox.list(identity, { ...options, unread: options.unread ?? true }),
-    projects,
+    projects: tasks
+      ? {
+          list_tasks: ({ topicId, ...page }) =>
+            tasks.listTasks(topicId, {
+              ...page,
+              limit: Math.min(page.limit ?? 10, 20),
+            }),
+          async claim_task({ taskId, idempotencyKey }) {
+            const { task } = await tasks.claim(
+              identity,
+              idempotencyKey,
+              uuid(taskId),
+            );
+            return { task };
+          },
+          async submit_artifact({ taskId, idempotencyKey, ...body }) {
+            const { task, artifact } = await tasks.submit(
+              identity,
+              idempotencyKey,
+              uuid(taskId),
+              submitArtifactInput(body),
+            );
+            return { task, artifact };
+          },
+        }
+      : undefined,
   };
 }

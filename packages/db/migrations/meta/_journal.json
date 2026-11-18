@@ -22,6 +22,13 @@
       "when": 1794989425486,
       "tag": "0002_m2_community",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794991284953,
+      "tag": "0003_m4_projects",
+      "breakpoints": true
     }
   ]
 }

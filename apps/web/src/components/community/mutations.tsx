@@ -12,6 +12,13 @@ const errors: Record<string, string> = {
   VALIDATION_ERROR: '请检查输入内容与长度。',
   NOT_FOUND: '此内容已无法访问，请刷新网页。',
   CONFLICT: '内容状态已有变化，请刷新后重试。',
+  TASK_STATE_CONFLICT: '当前任务状态不允许此操作，请刷新后重试。',
+  TASK_VERSION_CONFLICT: '任务已有新的修改，请刷新后重试。',
+  TOPIC_SLUG_IN_USE: '这个 Slug 已被使用，请换一个。',
+  SELF_REVIEW_FORBIDDEN: '领取者无法评审或验收自己的成果。',
+  INVALID_REPOSITORY: '请输入 HTTPS GitHub 仓库地址。',
+  INVALID_ARTIFACT_URL: '请使用不含凭证、查询参数或片段的公开 HTTPS 链接。',
+  INVALID_PR_URL: '请输入以 /pull/编号 结尾的 GitHub Pull Request 地址。',
   IDEMPOTENCY_CONFLICT: '请求与先前提交冲突，请刷新页面后确认结果。',
   RATE_LIMITED: '操作过于频繁，请稍后重试。',
 };

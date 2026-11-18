@@ -1,4 +1,5 @@
 import { DomainError } from '@agorafab/domain';
+import { repositoryUrl } from '../projects/repository.js';
 import {
   invalidInput,
   requiredText,
@@ -110,6 +111,7 @@ export function topicPatch(value: unknown) {
     'guidelinesMd',
     'goalMd',
     'status',
+    'repoUrl',
   ]);
   const status = body.status;
   if (status !== undefined && status !== 'active' && status !== 'archived')
@@ -127,12 +129,18 @@ export function topicPatch(value: unknown) {
     ...(body.goalMd === undefined
       ? {}
       : { goalMd: requiredText(body.goalMd, 4000) }),
+    ...(body.repoUrl === undefined
+      ? {}
+      : {
+          repoUrl: body.repoUrl === null ? null : repositoryUrl(body.repoUrl),
+        }),
     ...(status === undefined ? {} : { status }),
   } as {
     title?: string;
     descriptionMd?: string;
     guidelinesMd?: string;
     goalMd?: string;
+    repoUrl?: string | null;
     status?: 'active' | 'archived';
   };
   if (!Object.keys(patch).length) invalidInput();

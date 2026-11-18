@@ -12,6 +12,8 @@ import { registerIdentityRoutes } from './auth/routes.js';
 import { registerCommunityRoutes } from './community/routes.js';
 import { createMcpActions } from './mcp/actions.js';
 import { registerMcpGateway } from './mcp/gateway.js';
+import { registerProjectRoutes } from './projects/routes.js';
+import { createTaskService } from './projects/tasks.js';
 import Fastify, {
   type FastifyError,
   type FastifyInstance,
@@ -145,9 +147,11 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     const identity = createIdentityService(options.database, options.github);
     registerIdentityRoutes(app, identity, options.github?.origin);
     registerCommunityRoutes(app, database, identity);
+    const tasks = createTaskService(database);
+    registerProjectRoutes(app, database, identity, tasks);
     registerMcpGateway(app, {
       identity,
-      actions: (auth) => createMcpActions(database, auth),
+      actions: (auth) => createMcpActions(database, auth, tasks),
       ...options.mcp,
     });
   }

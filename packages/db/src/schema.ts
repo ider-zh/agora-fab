@@ -4,6 +4,7 @@ import {
   check,
   foreignKey,
   index,
+  integer,
   jsonb,
   pgTable,
   primaryKey,
@@ -238,6 +239,10 @@ export const topics = pgTable(
     descriptionMd: text('description_md').notNull().default(''),
     guidelinesMd: text('guidelines_md').notNull().default(''),
     goalMd: text('goal_md'),
+    originPostId: uuid('origin_post_id').references(
+      (): AnyPgColumn => posts.id,
+    ),
+    repoUrl: text('repo_url'),
     status: text('status', { enum: ['active', 'archived'] })
       .notNull()
       .default('active'),
@@ -273,6 +278,15 @@ export const topics = pgTable(
       'topics_project_goal_check',
       sql`${table.kind} <> 'project' or length(trim(${table.goalMd})) > 0 and ${table.goalMd} is not null`,
     ),
+    check(
+      'topics_project_provenance_check',
+      sql`${table.kind} = 'project' or (${table.originPostId} is null and ${table.repoUrl} is null)`,
+    ),
+    check(
+      'topics_repo_url_check',
+      sql`${table.repoUrl} is null or (length(${table.repoUrl}) <= 2048 and ${table.repoUrl} ~ '^https://[^[:space:]]+$')`,
+    ),
+    index('topics_origin_post_idx').on(table.originPostId),
   ],
 );
 
@@ -398,6 +412,137 @@ export const notifications = pgTable(
     ),
     index('notifications_recipient_created_idx').on(
       table.recipientId,
+      table.createdAt,
+      table.id,
+    ),
+  ],
+);
+
+export const taskStatuses = [
+  'proposed',
+  'open',
+  'claimed',
+  'submitted',
+  'in_review',
+  'done',
+  'changes_requested',
+  'cancelled',
+] as const;
+
+export const tasks = pgTable(
+  'tasks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    topicId: uuid('topic_id')
+      .notNull()
+      .references(() => topics.id),
+    sourcePostId: uuid('source_post_id'),
+    title: text('title').notNull(),
+    descriptionMd: text('description_md').notNull().default(''),
+    status: text('status', { enum: taskStatuses }).notNull().default('open'),
+    createdBy: uuid('created_by')
+      .notNull()
+      .references(() => principals.id),
+    assigneeId: uuid('assignee_id').references(() => principals.id),
+    reviewerId: uuid('reviewer_id').references(() => principals.id),
+    reviewNote: text('review_note'),
+    decisionNote: text('decision_note'),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'tasks_source_post_topic_fk',
+      columns: [table.sourcePostId, table.topicId],
+      foreignColumns: [posts.id, posts.topicId],
+    }),
+    check(
+      'tasks_title_check',
+      sql`length(${table.title}) between 1 and 200 and ${table.title} ~ '[^[:space:]]'`,
+    ),
+    check(
+      'tasks_text_sizes_check',
+      sql`length(${table.descriptionMd}) <= 12000 and coalesce(length(${table.reviewNote}), 0) <= 12000 and coalesce(length(${table.decisionNote}), 0) <= 12000`,
+    ),
+    check(
+      'tasks_status_check',
+      sql`${table.status} in ('proposed', 'open', 'claimed', 'submitted', 'in_review', 'done', 'changes_requested', 'cancelled')`,
+    ),
+    check('tasks_version_check', sql`${table.version} > 0`),
+    check(
+      'tasks_unassigned_status_check',
+      sql`${table.status} not in ('proposed', 'open') or (${table.assigneeId} is null and ${table.reviewerId} is null)`,
+    ),
+    check(
+      'tasks_assignee_required_check',
+      sql`${table.status} not in ('claimed', 'submitted', 'in_review', 'done', 'changes_requested') or ${table.assigneeId} is not null`,
+    ),
+    check(
+      'tasks_reviewer_required_check',
+      sql`${table.status} not in ('in_review', 'done', 'changes_requested') or ${table.reviewerId} is not null`,
+    ),
+    check(
+      'tasks_review_independence_check',
+      sql`${table.reviewerId} is null or ${table.reviewerId} is distinct from ${table.assigneeId}`,
+    ),
+    index('tasks_topic_status_created_idx').on(
+      table.topicId,
+      table.status,
+      table.createdAt,
+      table.id,
+    ),
+  ],
+);
+
+export const artifactKinds = [
+  'pr',
+  'document',
+  'research',
+  'commit',
+  'preview',
+  'other',
+] as const;
+
+export const artifacts = pgTable(
+  'artifacts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    taskId: uuid('task_id')
+      .notNull()
+      .references(() => tasks.id),
+    submittedBy: uuid('submitted_by')
+      .notNull()
+      .references(() => principals.id),
+    url: text('url').notNull(),
+    kind: text('kind', { enum: artifactKinds }).notNull().default('other'),
+    descriptionMd: text('description_md').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    taskVersion: integer('task_version').notNull(),
+  },
+  (table) => [
+    check(
+      'artifacts_kind_check',
+      sql`${table.kind} in ('pr', 'document', 'research', 'commit', 'preview', 'other')`,
+    ),
+    check(
+      'artifacts_url_check',
+      sql`length(${table.url}) <= 2048 and ${table.url} ~ '^https://[^[:space:]]+$'`,
+    ),
+    check(
+      'artifacts_description_size_check',
+      sql`length(${table.descriptionMd}) <= 12000`,
+    ),
+    check('artifacts_task_version_check', sql`${table.taskVersion} > 0`),
+    unique('artifacts_task_version_unique').on(table.taskId, table.taskVersion),
+    index('artifacts_task_created_idx').on(
+      table.taskId,
       table.createdAt,
       table.id,
     ),
