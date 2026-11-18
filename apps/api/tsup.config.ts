@@ -5,7 +5,7 @@ export default defineConfig({
   format: ['esm'],
   platform: 'node',
   target: 'node22',
-  noExternal: ['@agorafab/db'],
+  noExternal: ['@agorafab/db', '@agorafab/domain'],
   // The bundled pg dependency uses Node built-ins through CommonJS require.
   banner: {
     js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",

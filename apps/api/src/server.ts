@@ -5,7 +5,11 @@ import { ConfigurationError, loadConfig } from './config.js';
 async function main() {
   const config = loadConfig();
   const database = createDatabase(config.databaseUrl);
-  const app = buildApp({ checkDatabase: () => database.checkConnection() });
+  const app = buildApp({
+    checkDatabase: () => database.checkConnection(),
+    database,
+    github: config.github,
+  });
   app.addHook('onClose', async () => database.close());
 
   let shuttingDown = false;

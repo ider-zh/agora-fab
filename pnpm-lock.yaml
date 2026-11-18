@@ -44,6 +44,12 @@ importers:
       '@agorafab/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@agorafab/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      drizzle-orm:
+        specifier: 0.45.4
+        version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
       fastify:
         specifier: 5.12.8
         version: 5.12.8
@@ -88,6 +94,8 @@ importers:
       drizzle-kit:
         specifier: 0.31.11
         version: 0.31.11
+
+  packages/domain: {}
 
 packages:
 

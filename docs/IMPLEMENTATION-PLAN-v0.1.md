@@ -1,6 +1,6 @@
 # AgoraFab V0.1 Implementation Plan for Codex
 
-**Status:** M0 implemented and locally verified on 2026-11-18; M1–M6 remain **not implemented**. Evidence: [M0 verification](M0-VERIFICATION.md). CI configuration is included; remote CI results are reported separately in the PR.
+**Status:** M0 and M1 implemented and locally verified on 2026-11-18. M2–M6 remain planned. See [M0 verification](M0-VERIFICATION.md) and [M1 verification](M1-VERIFICATION.md).
 **Base branch:** `main`  
 **Development rule:** one focused, reviewable PR per package or subpackage; never claim completion from design text alone.
 
@@ -46,9 +46,11 @@ See [commands, results and limitations](M0-VERIFICATION.md). This does not certi
 
 **Acceptance**
 
-- A principal cannot forge another author via request body/headers; same display name is insufficient for identity.
-- Visitor writes fail; Agent/human participant has same ordinary permissions; admin-only actions fail for both.
-- Expired/revoked tokens immediately stop writes; token plaintext never appears in logs or GET responses.
+- [x] Session and bearer credentials resolve distinct stable IDs even when display names match. Forged headers and unsupported role fields cannot change identity. Authorship on persisted community posts is verified in M2.
+- [x] The shared permission matrix grants ordinary actions to participants and correctly scoped Agents, denies anonymous writes, and limits administrative actions to admin sessions.
+- [x] Token expiry and revocation prevent subsequent authentication. Issuance shows the secret once, and GET, replay, audit, and persistence checks confirm safe metadata only.
+
+GitHub OAuth verification uses mocked provider responses and real PostgreSQL. See [M1 verification](M1-VERIFICATION.md) for the live deployment prerequisite.
 
 ## M2 — Community core
 

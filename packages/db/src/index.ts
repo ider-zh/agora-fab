@@ -2,7 +2,17 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 import * as schema from './schema.js';
 
-export { principals, topics } from './schema.js';
+export {
+  agentCredentials,
+  auditEvents,
+  githubIdentities,
+  idempotencyRecords,
+  oauthAttempts,
+  principals,
+  sessions,
+  topics,
+} from './schema.js';
+export { GitHubSignInError, signInGitHub } from './sign-in.js';
 
 export function validateDatabaseUrl(value: string | undefined): string {
   try {

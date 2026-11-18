@@ -1,9 +1,9 @@
-# M0 development and operations
+# Development and operations
 
-The implemented slice is an application shell and reproducible persistence/runtime
-foundation. There are no human sessions, Agent credentials, business write routes,
-MCP tools or external-client compatibility claims. `packages/domain` and
-`packages/mcp` will be added when M1/M3 need them.
+The runtime foundation includes the application shell, human sessions, and
+administrator-managed Agent credentials. See [identity setup](IDENTITY.md).
+Shared authorization predicates live in `packages/domain`. MCP and client
+compatibility work is scheduled for M3.
 
 ## Toolchain and quality checks
 
@@ -85,7 +85,7 @@ allow these two ports from your intended LAN clients. HTTP is only suitable for
 this credential-free M0 LAN test; before M1+ is exposed, configure HTTPS, browser
 session protections and the documented authorization boundary.
 
-Web: `/` SSR status page and `/health` Web/API/DB health. API: `/health/live` proves
+Web: `/` SSR status page, `/account`, and `/health` Web/API/DB health. API: `/health/live` proves
 the process is serving; `/health/ready` executes a DB query. Readiness proves DB
 connectivity; the migration job separately gates initial startup. There are no
 Topic or MCP routes yet; `/api/topics` returns structured 404.

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import journal from '../../packages/db/migrations/meta/_journal.json';
 import { createDatabase, type Database } from '../../packages/db/src/index.js';
 import { migrateDatabase } from '../../packages/db/src/migrations.js';
 import { fixtureIds, seedFixtures } from '../../packages/db/src/seed.js';
@@ -79,7 +80,7 @@ describe('PostgreSQL migration and fixtures', () => {
     const migrations = await database.pool.query(
       'select count(*)::int as count from __drizzle_migrations',
     );
-    expect(migrations.rows[0].count).toBe(1);
+    expect(migrations.rows[0].count).toBe(journal.entries.length);
   });
 
   it('enforces stable identity, normalized unique handles and human-only admins', async () => {

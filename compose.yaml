@@ -58,6 +58,10 @@ services:
       HOST: 0.0.0.0
       PORT: 3001
       NODE_ENV: production
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
+      AUTH_PUBLIC_ORIGIN: ${AUTH_PUBLIC_ORIGIN:-}
+      GITHUB_ADMIN_IDS: ${GITHUB_ADMIN_IDS:-}
     ports:
       - '${BIND_ADDRESS:-127.0.0.1}:${API_PORT:-3101}:3001'
     restart: unless-stopped

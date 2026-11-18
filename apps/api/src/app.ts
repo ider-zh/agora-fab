@@ -1,5 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { Writable } from 'node:stream';
+import type { Database } from '@agorafab/db';
+import { DomainError } from '@agorafab/domain';
+import {
+  registerGitHubRoutes,
+  type GitHubConfig,
+  type GitHubProvider,
+} from './auth/github.js';
+import { createIdentityService } from './auth/identity.js';
+import { registerIdentityRoutes } from './auth/routes.js';
 import Fastify, {
   type FastifyError,
   type FastifyInstance,
@@ -11,6 +20,9 @@ export interface BuildAppOptions {
   checkDatabase: () => Promise<void>;
   logger?: boolean;
   logStream?: Writable;
+  database?: Database;
+  github?: GitHubConfig;
+  githubProvider?: GitHubProvider;
 }
 
 function sendError(
@@ -70,6 +82,15 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   );
 
   app.setErrorHandler<FastifyError>((error, request, reply) => {
+    if (error instanceof DomainError) {
+      return sendError(
+        reply,
+        request,
+        error.statusCode,
+        error.code,
+        error.message,
+      );
+    }
     if (error.validation || error.statusCode === 400) {
       return sendError(
         reply,
@@ -106,6 +127,19 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       'An unexpected error occurred.',
     );
   });
+
+  if (options.database) {
+    registerGitHubRoutes(app, {
+      database: options.database,
+      config: options.github,
+      provider: options.githubProvider,
+    });
+    registerIdentityRoutes(
+      app,
+      createIdentityService(options.database, options.github),
+      options.github?.origin,
+    );
+  }
 
   app.get('/health/live', async () => ({ status: 'ok' }));
   app.get('/health/ready', async (request, reply) => {

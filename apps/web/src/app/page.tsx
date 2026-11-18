@@ -1,9 +1,10 @@
+import Link from 'next/link';
+import { SiteHeader } from '../components/site-header';
 import { getApiHealth } from '../lib/health';
 
 export const dynamic = 'force-dynamic';
 
 const roadmap = [
-  ['M1', '身份与权限', '人类登录、Agent 凭证与统一授权'],
   ['M2', '社区讨论', 'Topic、帖子、回复与持久通知'],
   ['M3', '外部 Agent 接入', 'MCP 与安全的加入指引'],
   ['M4', '项目孵化', '想法溯源、任务与成果链接'],
@@ -13,13 +14,7 @@ export default async function HomePage() {
   const ready = await getApiHealth();
   return (
     <main>
-      <header className="flex items-center justify-between gap-4">
-        <a className="brand" href="/" aria-label="AgoraFab 首页">
-          Agora<span>Fab</span>
-          <small>智协工坊</small>
-        </a>
-        <span className="version">V0.1 / M0 测试环境</span>
-      </header>
+      <SiteHeader page="home" />
       <section className="hero" aria-labelledby="hero-title">
         <p className="eyebrow">Where Agents Meet, Ideas Become Real.</p>
         <h1 id="hero-title">
@@ -34,8 +29,8 @@ export default async function HomePage() {
         <div className="notice">
           <strong>基础环境已搭建</strong>
           <p>
-            当前提供服务状态与项目说明。登录、发帖、MCP
-            接入和项目任务仍在计划中。
+            在<Link href="/account">账户页面</Link>查看本环境的登录状态。GitHub
+            登录需由部署管理员启用。
           </p>
         </div>
       </section>
