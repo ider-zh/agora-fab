@@ -16,7 +16,15 @@ import {
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
 import type { FastifyRequest } from 'fastify';
 import { randomBytes } from 'node:crypto';
+import {
+  cursorBoundary,
+  cursorTimestamp,
+  readCursor,
+  slicePage,
+  type ListPageOptions,
+} from '../community/cursor.js';
 import { idempotent } from '../idempotency.js';
+import type { AuthorizeMutation } from '../traffic.js';
 import {
   agentTokenPattern,
   assertOrigin,
@@ -56,7 +64,11 @@ interface LoginSource {
   adminIds: ReadonlySet<string>;
 }
 
-export function createIdentityService(database: Database, login?: LoginSource) {
+export function createIdentityService(
+  database: Database,
+  login?: LoginSource,
+  authorize: AuthorizeMutation = requireAction,
+) {
   async function authenticate(
     request: FastifyRequest,
   ): Promise<AuthContext | null> {
@@ -65,7 +77,11 @@ export function createIdentityService(database: Database, login?: LoginSource) {
       const token = /^Bearer ([^ ]+)$/i.exec(authorization)?.[1];
       if (!token || !agentTokenPattern.test(token)) return null;
       const [result] = await database.db
-        .select({ principal: principals, scopes: agentCredentials.scopes })
+        .select({
+          principal: principals,
+          scopes: agentCredentials.scopes,
+          credentialId: agentCredentials.id,
+        })
         .from(agentCredentials)
         .innerJoin(principals, eq(agentCredentials.agentId, principals.id))
         .where(
@@ -82,6 +98,7 @@ export function createIdentityService(database: Database, login?: LoginSource) {
             method: 'bearer',
             principal: serializePrincipal(result.principal),
             scopes: result.scopes,
+            credentialId: result.credentialId,
           }
         : null;
     }
@@ -152,7 +169,7 @@ export function createIdentityService(database: Database, login?: LoginSource) {
       capabilities: string[];
     },
   ) {
-    const actor = requireAction(auth, 'admin');
+    const actor = authorize(auth, 'admin');
     return idempotent(
       database,
       actor.id,
@@ -204,7 +221,7 @@ export function createIdentityService(database: Database, login?: LoginSource) {
     key: string,
     input: { agentId: string; scopes: AgentScope[]; expiresInHours: number },
   ) {
-    const actor = requireAction(auth, 'admin');
+    const actor = authorize(auth, 'admin');
     return idempotent(
       database,
       actor.id,
@@ -272,7 +289,7 @@ export function createIdentityService(database: Database, login?: LoginSource) {
     agentId: string,
     credentialId: string,
   ) {
-    const actor = requireAction(auth, 'admin');
+    const actor = authorize(auth, 'admin');
     await database.db.transaction(async (tx) => {
       const where = and(
         eq(agentCredentials.id, credentialId),
@@ -307,7 +324,7 @@ export function createIdentityService(database: Database, login?: LoginSource) {
   }
 
   async function revokeAgent(auth: AuthContext | null, agentId: string) {
-    const actor = requireAction(auth, 'admin');
+    const actor = authorize(auth, 'admin');
     await database.db.transaction(async (tx) => {
       const target = and(
         eq(principals.id, agentId),
@@ -346,6 +363,47 @@ export function createIdentityService(database: Database, login?: LoginSource) {
     });
   }
 
+  async function listAgents(
+    auth: AuthContext | null,
+    options: ListPageOptions,
+  ) {
+    requireAction(auth, 'admin');
+    const scope = 'admin:agents';
+    const { limit, position } = readCursor(options, scope);
+    const rows = await database.db
+      .select({
+        principal: principals,
+        createdAt: cursorTimestamp(principals.createdAt),
+      })
+      .from(principals)
+      .where(
+        and(
+          eq(principals.kind, 'agent'),
+          cursorBoundary(position, principals.createdAt, principals.id, 'desc'),
+        ),
+      )
+      .orderBy(desc(principals.createdAt), desc(principals.id))
+      .limit(limit + 1);
+    return slicePage(
+      rows.map(({ principal, createdAt }) => ({
+        ...serializePrincipal(principal),
+        createdAt,
+      })),
+      limit,
+      scope,
+    );
+  }
+
+  async function getAgent(auth: AuthContext | null, agentId: string) {
+    requireAction(auth, 'admin');
+    const [row] = await database.db
+      .select()
+      .from(principals)
+      .where(and(eq(principals.kind, 'agent'), eq(principals.id, agentId)));
+    if (!row) throw new DomainError(404, 'AGENT_NOT_FOUND', 'Agent not found.');
+    return serializePrincipal(row);
+  }
+
   async function listTokens(auth: AuthContext | null, agentId: string) {
     requireAction(auth, 'admin');
     const { id, scopes, expiresAt, revokedAt, createdAt } = agentCredentials;
@@ -365,6 +423,8 @@ export function createIdentityService(database: Database, login?: LoginSource) {
     issueToken,
     revokeToken,
     revokeAgent,
+    listAgents,
+    getAgent,
     listTokens,
   };
 }

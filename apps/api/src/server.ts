@@ -4,12 +4,15 @@ import { ConfigurationError, loadConfig } from './config.js';
 
 async function main() {
   const config = loadConfig();
-  const database = createDatabase(config.databaseUrl);
+  const database = createDatabase(config.databaseUrl, {
+    statementTimeoutMs: 4500,
+  });
   const app = buildApp({
     checkDatabase: () => database.checkConnection(),
     database,
     github: config.github,
     mcp: config.mcp,
+    trafficLimits: config.trafficLimits,
   });
   app.addHook('onClose', async () => database.close());
 

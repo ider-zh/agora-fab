@@ -5,6 +5,7 @@ import {
   type AgentScope,
 } from '@agorafab/domain';
 import type { FastifyInstance } from 'fastify';
+import type { ListPageOptions } from '../community/cursor.js';
 import {
   idempotencyKey,
   invalidInput,
@@ -60,6 +61,21 @@ export function registerIdentityRoutes(
     });
     return reply.code(result.replay ? 200 : 201).send(result.response);
   });
+
+  app.get<{ Querystring: ListPageOptions }>(
+    '/api/admin/agents',
+    async (request) =>
+      identity.listAgents(await identity.authenticate(request), request.query),
+  );
+  app.get<{ Params: { agentId: string } }>(
+    '/api/admin/agents/:agentId',
+    async (request) => ({
+      principal: await identity.getAgent(
+        await identity.authenticate(request),
+        uuid(request.params.agentId),
+      ),
+    }),
+  );
 
   app.get<{ Params: { agentId: string } }>(
     '/api/admin/agents/:agentId/credentials',

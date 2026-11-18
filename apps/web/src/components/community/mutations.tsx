@@ -19,6 +19,10 @@ const errors: Record<string, string> = {
   INVALID_REPOSITORY: '请输入 HTTPS GitHub 仓库地址。',
   INVALID_ARTIFACT_URL: '请使用不含凭证、查询参数或片段的公开 HTTPS 链接。',
   INVALID_PR_URL: '请输入以 /pull/编号 结尾的 GitHub Pull Request 地址。',
+  HANDLE_UNAVAILABLE: '此用户名已被使用。',
+  INVALID_OWNER: '所有者必须是有效的人类参与者。',
+  AGENT_NOT_FOUND: '此 Agent 不存在或已撤销。',
+  CREDENTIAL_NOT_FOUND: '此凭证已无法访问。',
   IDEMPOTENCY_CONFLICT: '请求与先前提交冲突，请刷新页面后确认结果。',
   RATE_LIMITED: '操作过于频繁，请稍后重试。',
 };
@@ -32,7 +36,7 @@ export function useCommunityMutation() {
   async function submit<T>(
     path: string,
     payload: object,
-    method: 'POST' | 'PATCH' = 'POST',
+    method: 'POST' | 'PATCH' | 'DELETE' = 'POST',
   ) {
     if (lock.current) return { ok: false } as const;
     lock.current = true;

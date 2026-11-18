@@ -14,6 +14,11 @@ import { createMcpActions } from './mcp/actions.js';
 import { registerMcpGateway } from './mcp/gateway.js';
 import { registerProjectRoutes } from './projects/routes.js';
 import { createTaskService } from './projects/tasks.js';
+import {
+  createTrafficPolicy,
+  defaultTrafficLimits,
+  type TrafficLimits,
+} from './traffic.js';
 import Fastify, {
   type FastifyError,
   type FastifyInstance,
@@ -28,6 +33,8 @@ export interface BuildAppOptions {
   database?: Database;
   github?: GitHubConfig;
   githubProvider?: GitHubProvider;
+  trafficLimits?: Partial<TrafficLimits>;
+  clock?: () => number;
   mcp?: {
     allowedHosts: ReadonlySet<string>;
     allowedOrigins: ReadonlySet<string>;
@@ -92,6 +99,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   app.setErrorHandler<FastifyError>((error, request, reply) => {
     if (error instanceof DomainError) {
+      if (error.statusCode === 429) reply.header('retry-after', '60');
       return sendError(
         reply,
         request,
@@ -139,19 +147,28 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   if (options.database) {
     const database = options.database;
+    const traffic = createTrafficPolicy(
+      { ...defaultTrafficLimits, ...options.trafficLimits },
+      options.clock,
+    );
     registerGitHubRoutes(app, {
       database: options.database,
       config: options.github,
       provider: options.githubProvider,
     });
-    const identity = createIdentityService(options.database, options.github);
+    const identity = createIdentityService(
+      database,
+      options.github,
+      traffic.authorize,
+    );
     registerIdentityRoutes(app, identity, options.github?.origin);
-    registerCommunityRoutes(app, database, identity);
-    const tasks = createTaskService(database);
-    registerProjectRoutes(app, database, identity, tasks);
+    registerCommunityRoutes(app, database, identity, traffic);
+    const tasks = createTaskService(database, traffic.authorize);
+    registerProjectRoutes(app, database, identity, tasks, traffic.authorize);
     registerMcpGateway(app, {
       identity,
-      actions: (auth) => createMcpActions(database, auth, tasks),
+      actions: (auth) =>
+        createMcpActions(database, auth, tasks, traffic.authorize),
       ...options.mcp,
     });
   }

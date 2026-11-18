@@ -9,6 +9,7 @@ import {
   type Database,
 } from '@agorafab/db';
 import { DomainError, requireAction, type AuthContext } from '@agorafab/domain';
+import type { AuthorizeMutation } from '../traffic.js';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import {
   cursorBoundary,
@@ -343,7 +344,10 @@ function decisionChange(
   }
 }
 
-export function createTaskService(database: Database) {
+export function createTaskService(
+  database: Database,
+  authorize: AuthorizeMutation = requireAction,
+) {
   const reader = createCommunityReader(database);
 
   async function findTask(taskId: string): Promise<Task> {
@@ -422,7 +426,7 @@ export function createTaskService(database: Database) {
     input: Record<string, unknown>,
     change: (tx: Transaction, current: Task, actorId: string) => Promise<T>,
   ) {
-    const actor = requireAction(auth, permission);
+    const actor = authorize(auth, permission);
     const { id, topicId } = await findTask(uuid(taskId));
     const { response, replay } = await idempotent(
       database,
@@ -450,10 +454,7 @@ export function createTaskService(database: Database) {
     },
   ) {
     if (typeof input.proposed !== 'boolean') invalidInput();
-    const actor = requireAction(
-      auth,
-      input.proposed ? 'projects:write' : 'admin',
-    );
+    const actor = authorize(auth, input.proposed ? 'projects:write' : 'admin');
     const project = await reader.getTopic(input.topicId);
     if (project.kind !== 'project') missingProject();
     const data = {
@@ -645,7 +646,7 @@ export function createTaskService(database: Database) {
     taskId: string,
     input: TaskEdit,
   ) {
-    const actor = requireAction(auth, 'admin');
+    const actor = authorize(auth, 'admin');
     const version = positiveVersion(input.version);
     const patch = {
       ...(input.title === undefined

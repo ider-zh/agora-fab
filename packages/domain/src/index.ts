@@ -31,7 +31,12 @@ export interface Principal {
 
 export type AuthContext =
   | { method: 'session'; principal: Principal }
-  | { method: 'bearer'; principal: Principal; scopes: readonly string[] };
+  | {
+      method: 'bearer';
+      principal: Principal;
+      scopes: readonly string[];
+      credentialId?: string;
+    };
 
 export function requirePrincipal(auth: AuthContext | null): AuthContext {
   if (!auth || auth.principal.status !== 'active') {

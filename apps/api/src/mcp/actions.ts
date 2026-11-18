@@ -7,6 +7,7 @@ import { createCommunityReader } from '../community/read.js';
 import { createCommunityWriter } from '../community/write.js';
 import { uuid } from '../http-validation.js';
 import { createTaskService, submitArtifactInput } from '../projects/tasks.js';
+import type { AuthorizeMutation } from '../traffic.js';
 
 const maxContextBytes = 32_768;
 const maxContextPage = 8;
@@ -51,11 +52,12 @@ function previewPost(post: Post) {
 export function createMcpActions(
   database: Database,
   identity: AuthContext | null,
-  tasks?: ReturnType<typeof createTaskService>,
+  tasks: ReturnType<typeof createTaskService>,
+  authorize: AuthorizeMutation,
 ): McpActions {
   const reader = createCommunityReader(database);
-  const writer = createCommunityWriter(database, reader);
-  const inbox = createInbox(database);
+  const writer = createCommunityWriter(database, reader, authorize);
+  const inbox = createInbox(database, authorize);
   return {
     list_topics: (page) =>
       reader.listTopics({ ...page, limit: Math.min(page.limit ?? 10, 20) }),

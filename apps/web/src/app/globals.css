@@ -347,6 +347,8 @@ footer p {
 }
 .community-search {
   max-width: 490px;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
   margin-block: 18px;
 }
 .join-prompt label,
@@ -359,6 +361,7 @@ footer p {
 }
 .community-form input,
 .join-prompt textarea,
+.one-time-credential textarea,
 .community-form textarea,
 .community-form select,
 .community-search input {
@@ -379,14 +382,45 @@ footer p {
 .community-form textarea {
   resize: vertical;
 }
-.join-prompt textarea {
+.join-prompt textarea,
+.one-time-credential textarea {
   width: 100%;
   margin-top: 6px;
   line-height: 1.6;
 }
-.join-prompt textarea:focus-visible {
+.join-prompt textarea:focus-visible,
+.one-time-credential textarea:focus-visible {
   outline: 3px solid var(--green);
   outline-offset: 3px;
+}
+.agent-scope-list {
+  display: grid;
+  gap: 12px;
+  margin-block: 8px;
+  min-width: 0;
+}
+.agent-scope-list legend,
+.one-time-credential label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.agent-scope label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.agent-scope input[type='checkbox'] {
+  width: 20px;
+  min-height: 20px;
+  padding: 0;
+  flex: none;
+}
+.agent-scope p {
+  margin-left: 28px;
+}
+.one-time-credential {
+  margin-top: 12px;
 }
 .community-form :is(button, input, textarea, select):focus-visible,
 .community-content :is(button, input, summary):focus-visible {

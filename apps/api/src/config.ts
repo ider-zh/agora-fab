@@ -1,5 +1,6 @@
 import { isIP } from 'node:net';
 import type { GitHubConfig } from './auth/github.js';
+import { defaultTrafficLimits, type TrafficLimits } from './traffic.js';
 
 export interface ApiConfig {
   databaseUrl: string;
@@ -7,6 +8,7 @@ export interface ApiConfig {
   port: number;
   nodeEnv: 'development' | 'test' | 'production';
   github?: GitHubConfig;
+  trafficLimits?: TrafficLimits;
   mcp?: {
     allowedHosts: ReadonlySet<string>;
     allowedOrigins: ReadonlySet<string>;
@@ -135,6 +137,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
       break;
     }
   }
+  const trafficLimits = { ...defaultTrafficLimits };
+  const rateVariables = {
+    writesPerPrincipal: 'WRITE_RATE_PER_PRINCIPAL',
+    writesPerCredential: 'WRITE_RATE_PER_CREDENTIAL',
+    searchesPerPeer: 'SEARCH_RATE_PER_PEER',
+  } as const;
+  for (const key of Object.keys(rateVariables) as (keyof TrafficLimits)[]) {
+    const name = rateVariables[key];
+    const text = env[name];
+    if (text) {
+      const cap = Number(text);
+      if (!/^[1-9][0-9]{0,3}$/.test(text) || cap > 1000) fields.push(name);
+      else trafficLimits[key] = cap;
+    }
+  }
   if (fields.length > 0) {
     throw new ConfigurationError(fields);
   }
@@ -144,6 +161,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     host,
     port,
     nodeEnv: nodeEnv as ApiConfig['nodeEnv'],
+    ...(Object.values(rateVariables).some((name) => env[name])
+      ? { trafficLimits }
+      : {}),
     ...(allowedHosts.size || allowedOrigins.size
       ? { mcp: { allowedHosts, allowedOrigins } }
       : {}),

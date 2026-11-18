@@ -125,6 +125,10 @@ services. A normally connected host needs no such override.
 
 ## Data, shutdown and rollback
 
+Use [backup and restore](BACKUP.md) before applying migrations or changing the
+deployment topology. The restore rehearsal starts a clean isolated PostgreSQL
+container and compares its row totals against the archive.
+
 ```sh
 docker compose down
 ```

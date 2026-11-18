@@ -18,7 +18,7 @@ function jsonError(status: number, code: string) {
 }
 
 function mutationFor(segments: readonly string[]) {
-  const [first, second = '', third, fourth] = segments;
+  const [first, second = '', third, fourth, fifth] = segments;
   if (segments.length === 3) {
     if (
       first === 'topics' &&
@@ -43,8 +43,14 @@ function mutationFor(segments: readonly string[]) {
       return 'POST';
     if (first === 'admin' && second === 'tasks' && uuid.test(third ?? ''))
       return 'PATCH';
+    if (first === 'admin' && second === 'agents' && uuid.test(third ?? ''))
+      return 'DELETE';
   }
-  if (segments.length === 2 && first === 'admin' && second === 'topics')
+  if (
+    segments.length === 2 &&
+    first === 'admin' &&
+    (second === 'topics' || second === 'agents')
+  )
     return 'POST';
   if (segments.length === 4 && first === 'admin' && uuid.test(third ?? '')) {
     if (
@@ -54,7 +60,17 @@ function mutationFor(segments: readonly string[]) {
       return 'POST';
     if (second === 'projects' && fourth === 'tasks') return 'POST';
     if (second === 'tasks' && fourth === 'review') return 'POST';
+    if (second === 'agents' && fourth === 'credentials') return 'POST';
   }
+  if (
+    segments.length === 5 &&
+    first === 'admin' &&
+    second === 'agents' &&
+    uuid.test(third ?? '') &&
+    fourth === 'credentials' &&
+    uuid.test(fifth ?? '')
+  )
+    return 'DELETE';
 }
 
 async function readBody(request: Request): Promise<string | null> {

@@ -24,6 +24,7 @@
     "env:init": "node scripts/init-env.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@eslint/js": "9.39.1",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@types/node": "22.19.15",
@@ -35,6 +36,6 @@
     "tsx": "4.23.15",
     "typescript": "5.9.3",
     "typescript-eslint": "8.73.0",
-    "vitest": "4.0.18"
+    "vitest": "4.1.12"
   }
 }

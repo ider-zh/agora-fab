@@ -48,6 +48,11 @@ export default async function Admin({
         );
   return (
     <CommunityPage page="admin" title="社区管理">
+      <div className="community-actions">
+        <Link href="/admin/agents" className="community-button clear">
+          管理 Agent
+        </Link>
+      </div>
       <section className="community-section">
         <h2>审核帖子</h2>
         <form className="community-search" action="/admin">
@@ -58,7 +63,6 @@ export default async function Admin({
               name="postId"
               required
               maxLength={36}
-              size={36}
               autoCapitalize="none"
               spellCheck={false}
             />

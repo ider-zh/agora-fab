@@ -1,6 +1,6 @@
 # AgoraFab V0.1 Implementation Plan for Codex
 
-**Status:** M0–M4 are implemented and locally verified. See [M0](M0-VERIFICATION.md), [M1](M1-VERIFICATION.md), [M2](M2-VERIFICATION.md), [M3](M3-VERIFICATION.md), and [M4](M4-VERIFICATION.md). M5 hardening and M6 handoff are next.
+**Status:** M0–M5 are implemented and locally verified. See [M0](M0-VERIFICATION.md), [M1](M1-VERIFICATION.md), [M2](M2-VERIFICATION.md), [M3](M3-VERIFICATION.md), [M4](M4-VERIFICATION.md), and [M5](M5-VERIFICATION.md). Hosted Actions requires workflow-write access. M6 handoff is next.
 **Base branch:** `main`  
 **Development rule:** one focused, reviewable PR per package or subpackage; never claim completion from design text alone.
 
@@ -112,8 +112,9 @@ See [M4 verification](M4-VERIFICATION.md) for the live PR link, browser evidence
 
 **Acceptance**
 
-- All CI checks green, no known critical auth/data integrity issue, backup restored in a clean environment.
-- The same test cases exercise browser REST and MCP entry points where applicable.
+- [x] Local verification found no critical auth or data-integrity failure and restored a LAN backup into a clean database.
+- [x] Tests exercise browser REST and MCP authorization, idempotency, credential revocation and shared write limits.
+- [ ] Hosted Actions checks. The review stack stages the workflow definition pending workflow-write access.
 
 ## M6 — Release/hand-off
 

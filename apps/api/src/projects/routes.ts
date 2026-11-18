@@ -2,6 +2,7 @@ import type { Database } from '@agorafab/db';
 import { requireAction } from '@agorafab/domain';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { IdentityService } from '../auth/identity.js';
+import type { AuthorizeMutation } from '../traffic.js';
 import type { ListPageOptions } from '../community/cursor.js';
 import {
   idempotencyKey,
@@ -53,8 +54,9 @@ export function registerProjectRoutes(
   database: Database,
   identity: IdentityService,
   tasks: ReturnType<typeof createTaskService>,
+  authorize: AuthorizeMutation,
 ) {
-  const { promote } = createPromotionService(database);
+  const { promote } = createPromotionService(database, authorize);
 
   app.post<TaskParams>(
     '/api/admin/posts/:id/promote',

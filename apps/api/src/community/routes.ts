@@ -2,6 +2,7 @@ import { type Database } from '@agorafab/db';
 import { requireAction } from '@agorafab/domain';
 import type { FastifyInstance } from 'fastify';
 import type { IdentityService } from '../auth/identity.js';
+import type { createTrafficPolicy } from '../traffic.js';
 import {
   idempotencyKey,
   invalidInput,
@@ -21,10 +22,11 @@ export function registerCommunityRoutes(
   app: FastifyInstance,
   database: Database,
   identity: IdentityService,
+  traffic: ReturnType<typeof createTrafficPolicy>,
 ) {
   const reader = createCommunityReader(database);
-  const writer = createCommunityWriter(database, reader);
-  const inbox = createInbox(database);
+  const writer = createCommunityWriter(database, reader, traffic.authorize);
+  const inbox = createInbox(database, traffic.authorize);
 
   app.get<{ Querystring: ListPageOptions }>('/api/topics', async (request) =>
     reader.listTopics(request.query),
@@ -41,7 +43,10 @@ export function registerCommunityRoutes(
   );
   app.get<{ Querystring: ListPageOptions & { q: string } }>(
     '/api/search',
-    async (request) => reader.search(request.query),
+    async (request) => {
+      traffic.checkSearch(request.ip);
+      return reader.search(request.query);
+    },
   );
 
   app.post<ReadParams>('/api/topics/:id/posts', async (request, reply) => {

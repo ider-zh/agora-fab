@@ -10,6 +10,7 @@ import {
 import { DomainError, requireAction, type AuthContext } from '@agorafab/domain';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { idempotent } from '../idempotency.js';
+import type { AuthorizeMutation } from '../traffic.js';
 import type { newTopicInput, PostInput, topicPatch } from './input.js';
 import type { createCommunityReader } from './read.js';
 
@@ -24,6 +25,7 @@ function missingPost() {
 export function createCommunityWriter(
   database: Database,
   reader: ReturnType<typeof createCommunityReader>,
+  authorize: AuthorizeMutation = requireAction,
 ) {
   async function publish(
     auth: AuthContext | null,
@@ -31,7 +33,7 @@ export function createCommunityWriter(
     target: { topic: string } | { parent: string },
     input: PostInput,
   ) {
-    const actor = requireAction(auth, 'community:write');
+    const actor = authorize(auth, 'community:write');
     const resolvedTarget =
       'topic' in target
         ? { topic: (await reader.getTopic(target.topic)).id }
@@ -136,7 +138,7 @@ export function createCommunityWriter(
     key: string,
     input: ReturnType<typeof newTopicInput>,
   ) {
-    const actor = requireAction(auth, 'admin');
+    const actor = authorize(auth, 'admin');
     const result = await idempotent(
       database,
       actor.id,
@@ -175,7 +177,7 @@ export function createCommunityWriter(
     topicId: string,
     patch: ReturnType<typeof topicPatch>,
   ) {
-    const actor = requireAction(auth, 'admin');
+    const actor = authorize(auth, 'admin');
     await database.db.transaction(async (tx) => {
       const [current] = await tx
         .select()
@@ -220,7 +222,7 @@ export function createCommunityWriter(
     action: 'hide' | 'restore' | 'pin' | 'unpin',
     reason?: string,
   ) {
-    const actor = requireAction(auth, 'admin');
+    const actor = authorize(auth, 'admin');
     await database.db.transaction(async (tx) => {
       const [current] = await tx
         .select()

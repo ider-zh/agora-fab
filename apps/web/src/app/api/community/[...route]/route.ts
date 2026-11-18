@@ -8,4 +8,4 @@ async function handle(request: Request, context: Context) {
   return proxyCommunity(request, (await context.params).route);
 }
 
-export { handle as POST, handle as PATCH };
+export { handle as POST, handle as PATCH, handle as DELETE };

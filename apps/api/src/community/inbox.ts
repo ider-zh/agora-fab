@@ -1,6 +1,7 @@
 import { notifications, posts, topics, type Database } from '@agorafab/db';
 import { DomainError, requireAction, type AuthContext } from '@agorafab/domain';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
+import type { AuthorizeMutation } from '../traffic.js';
 import {
   cursorBoundary,
   cursorTimestamp,
@@ -10,7 +11,10 @@ import {
 } from './cursor.js';
 import { publicPostVisibility } from './read.js';
 
-export function createInbox(database: Database) {
+export function createInbox(
+  database: Database,
+  authorize: AuthorizeMutation = requireAction,
+) {
   async function list(
     auth: AuthContext | null,
     options: ListPageOptions & { unread?: boolean },
@@ -50,7 +54,7 @@ export function createInbox(database: Database) {
   }
 
   async function acknowledge(auth: AuthContext | null, id: string) {
-    const actor = requireAction(auth, 'notifications:write');
+    const actor = authorize(auth, 'notifications:write');
     const [row] = await database.db
       .update(notifications)
       .set({ readAt: sql`coalesce(${notifications.readAt}, now())` })

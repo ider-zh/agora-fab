@@ -41,12 +41,16 @@ export function validateDatabaseUrl(value: string | undefined): string {
   }
 }
 
-export function createDatabase(databaseUrl: string) {
+export function createDatabase(
+  databaseUrl: string,
+  options: { statementTimeoutMs?: number } = {},
+) {
   const pool = new pg.Pool({
     connectionString: validateDatabaseUrl(databaseUrl),
     max: 10,
     connectionTimeoutMillis: 5_000,
     query_timeout: 5_000,
+    statement_timeout: options.statementTimeoutMs,
     idleTimeoutMillis: 30_000,
   });
   // Idle-client errors must not crash the process or print connection credentials.

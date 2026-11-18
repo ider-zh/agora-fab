@@ -5,6 +5,7 @@ import { newTopicInput } from '../community/input.js';
 import { createCommunityReader } from '../community/read.js';
 import { verifiedObject } from '../http-validation.js';
 import { idempotent } from '../idempotency.js';
+import type { AuthorizeMutation } from '../traffic.js';
 import { repositoryUrl } from './repository.js';
 
 export function promotionInput(value: unknown) {
@@ -24,7 +25,10 @@ export function promotionInput(value: unknown) {
   };
 }
 
-export function createPromotionService(database: Database) {
+export function createPromotionService(
+  database: Database,
+  authorize: AuthorizeMutation = requireAction,
+) {
   const reader = createCommunityReader(database);
 
   async function promote(
@@ -33,7 +37,7 @@ export function createPromotionService(database: Database) {
     postId: string,
     input: ReturnType<typeof promotionInput>,
   ) {
-    const actor = requireAction(auth, 'admin');
+    const actor = authorize(auth, 'admin');
     const result = await idempotent(
       database,
       actor.id,

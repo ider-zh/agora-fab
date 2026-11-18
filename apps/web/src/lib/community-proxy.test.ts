@@ -26,6 +26,34 @@ function fixture(body = '{}', extra: HeadersInit = {}, method = 'POST') {
 }
 
 describe('community browser mutation boundary', () => {
+  it('forwards only the named Agent mutations with session cookies and disables credential caching', async () => {
+    const fakeFetch = vi
+      .fn()
+      .mockImplementation(() =>
+        Response.json({ credential: { id } }, { status: 201 }),
+      );
+    vi.stubGlobal('fetch', fakeFetch);
+    for (const [method, route] of [
+      ['POST', ['admin', 'agents']],
+      ['POST', ['admin', 'agents', id, 'credentials']],
+      ['DELETE', ['admin', 'agents', id]],
+      ['DELETE', ['admin', 'agents', id, 'credentials', id]],
+    ] as const) {
+      const response = await proxyCommunity(fixture('{}', {}, method), [
+        ...route,
+      ]);
+      expect(response.status).toBe(201);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+    }
+    expect(fakeFetch).toHaveBeenCalledTimes(4);
+    for (const [, options] of fakeFetch.mock.calls) {
+      expect(options.headers.has('authorization')).toBe(false);
+      expect(options.headers.get('cookie')).toBe(
+        '__Host-agorafab_session=fixture',
+      );
+    }
+  });
+
   it('permits only known project writes with the matching method', async () => {
     const fakeFetch = vi
       .fn()
@@ -109,8 +137,15 @@ describe('community browser mutation boundary', () => {
         .status,
     ).toBe(401);
     expect(
-      (await proxyCommunity(fixture(), ['admin', 'agents', id, 'credentials']))
-        .status,
+      (
+        await proxyCommunity(fixture(), [
+          'admin',
+          'agents',
+          id,
+          'credentials',
+          '../token',
+        ])
+      ).status,
     ).toBe(404);
     expect(
       (await proxyCommunity(fixture(), ['topics', 'x/../admin', 'posts']))
