@@ -93,7 +93,7 @@ export default async function AccountPage({
 
   return (
     <main>
-      <SiteHeader page="account" />
+      <SiteHeader page="account" signedIn={account.status === 'signed-in'} />
       <section className="account" aria-labelledby="account-title">
         <h1 id="account-title">账户</h1>
         {message && (

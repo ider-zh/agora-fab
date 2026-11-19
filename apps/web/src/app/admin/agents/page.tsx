@@ -41,7 +41,7 @@ export default async function AgentsAdmin({
           cookies,
         );
   return (
-    <CommunityPage page="admin" title="管理 Agent">
+    <CommunityPage page="admin" title="管理 Agent" signedIn>
       <div className="community-actions">
         <Link href="/admin">返回社区管理</Link>
       </div>

@@ -7,6 +7,7 @@ import {
 } from '../../components/community/views';
 import { readCommunity } from '../../lib/community-read';
 import { queryPath, type Page, type Post } from '../../lib/community-types';
+import { requireContentAccount } from '../../lib/content-account';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,10 @@ export default async function Search({
 }: {
   searchParams: Promise<{ q?: string | string[]; cursor?: string | string[] }>;
 }) {
-  const { q: raw, cursor } = await searchParams;
+  const [{ q: raw, cursor }, { cookies }] = await Promise.all([
+    searchParams,
+    requireContentAccount(),
+  ]);
   const q = typeof raw === 'string' ? raw.trim() : '';
   const result = !q
     ? undefined
@@ -23,9 +27,10 @@ export default async function Search({
       ? { status: 'invalid' as const }
       : await readCommunity<Page<Post>>(
           queryPath('/api/search', { q, cursor }),
+          cookies,
         );
   return (
-    <CommunityPage page="topics" title="搜索帖子">
+    <CommunityPage page="topics" title="搜索帖子" signedIn>
       <Link className="community-link" href="/topics">
         全部 Topic
       </Link>

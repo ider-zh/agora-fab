@@ -23,7 +23,7 @@ docker compose config --quiet
 docker compose up --build -d --wait
 docker compose ps -a
 curl -fsS http://127.0.0.1:3100/health
-SMOKE_FIXTURES=0 node scripts/smoke.mjs
+node scripts/smoke.mjs
 ```
 
 `.env` is created with mode 0600 and a generated PostgreSQL bootstrap password.
@@ -125,7 +125,8 @@ and set default privileges as the actual migration owner. The default grants
 apply to future tables created by that owner.
 
 Run `docker compose up --build -d --wait` after configuration. Verify the external
-health route and anonymous MCP tool discovery before testing authenticated access.
+health route, anonymous MCP tool discovery, and rejection of anonymous content
+reads before testing authenticated access.
 
 ```sh
 curl -fsS https://forum.example.org/health

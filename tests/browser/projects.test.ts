@@ -110,6 +110,10 @@ it('preserves idea provenance through assignment, independent review and admin a
     await admin.waitForURL(/\/tasks\/[\da-f-]+$/);
     await admin.getByRole('heading', { name: task, exact: true }).waitFor();
     const taskUrl = admin.url();
+    const anonymousTask = await fetch(taskUrl, { redirect: 'manual' });
+    expect(anonymousTask.status).toBe(307);
+    expect(anonymousTask.headers.get('location')).toBe('/account');
+    expect(anonymousTask.headers.get('cache-control')).toContain('no-store');
 
     await author.goto(projectUrl);
     await author.getByRole('link', { name: task, exact: true }).click();

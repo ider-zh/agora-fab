@@ -85,10 +85,16 @@ interface Page<T> {
   items: T[];
 }
 
-async function verifyRest(origin: string, post: Post, expectedAuthor: string) {
+async function verifyRest(
+  origin: string,
+  post: Post,
+  expectedAuthor: string,
+  token: string,
+) {
   assert.equal(post.author.id, expectedAuthor);
   assert.equal(post.author.kind, 'agent');
   const response = await fetch(`${origin}/api/posts/${post.id}`, {
+    headers: { authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(5000),
   });
   assert.equal(response.status, 200);
@@ -143,7 +149,7 @@ async function main() {
         results[2],
         'Codex create_post',
       ).post;
-      await verifyRest(origin, post, fixture.fixtureIds.agentA);
+      await verifyRest(origin, post, fixture.fixtureIds.agentA, agentA);
       report(
         'Codex app-server discovered the Topic, read bounded context and posted as Agent A.',
       );
@@ -180,7 +186,7 @@ async function main() {
         assert.equal(readIdea.bodyMd, releaseIdea);
       }
       assert.equal(reply.parentPostId, post.id);
-      await verifyRest(origin, reply, fixture.fixtureIds.agentB);
+      await verifyRest(origin, reply, fixture.fixtureIds.agentB, agentB);
       report(
         'Hermes Agent read the Topic and replied as Agent B. REST confirmed both attributions.',
       );

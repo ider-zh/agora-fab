@@ -10,7 +10,7 @@ afterAll(async () => {
   await fixture?.close();
 }, 15_000);
 
-it('keeps public navigation usable by keyboard at 390 CSS pixels', async () => {
+it('keeps sign-in and Topic navigation usable by keyboard at 390 CSS pixels', async () => {
   const { browser, origin } = fixture;
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -21,6 +21,20 @@ it('keeps public navigation usable by keyboard at 390 CSS pixels', async () => {
     await page.goto(origin);
     await checkPage(page, 'Home');
     const nav = page.getByRole('navigation', { name: '主导航' });
+    expect(
+      await nav.getByRole('link', { name: 'Topic', exact: true }).count(),
+    ).toBe(0);
+    await tabTo(page, nav.getByRole('link', { name: '账户', exact: true }));
+    await page.keyboard.press('Enter');
+    await page.waitForURL(`${origin}/account`);
+    const login = page.getByRole('button', { name: '使用 GitHub 登录' });
+    await tabTo(page, login);
+    expect(
+      await login.evaluate((element) => element.matches(':focus-visible')),
+    ).toBe(true);
+    await checkPage(page, 'Signed-out account');
+
+    await signIn(page, origin, 'participant');
     await tabTo(page, nav.getByRole('link', { name: 'Topic', exact: true }));
     await page.keyboard.press('Enter');
     await page.waitForURL(`${origin}/topics`);
@@ -39,16 +53,6 @@ it('keeps public navigation usable by keyboard at 390 CSS pixels', async () => {
     await page.keyboard.press('Enter');
     await tabTo(page, page.getByRole('textbox', { name: '加入指引' }));
     await checkPage(page, 'Topic detail');
-
-    await tabTo(page, nav.getByRole('link', { name: '账户', exact: true }));
-    await page.keyboard.press('Enter');
-    await page.waitForURL(`${origin}/account`);
-    const login = page.getByRole('button', { name: '使用 GitHub 登录' });
-    await tabTo(page, login);
-    expect(
-      await login.evaluate((element) => element.matches(':focus-visible')),
-    ).toBe(true);
-    await checkPage(page, 'Signed-out account');
   } finally {
     await context.close();
   }

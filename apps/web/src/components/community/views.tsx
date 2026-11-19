@@ -7,15 +7,17 @@ import { Markdown } from './markdown';
 export function CommunityPage({
   page,
   title,
+  signedIn = false,
   children,
 }: {
   page: SitePage;
   title: string;
+  signedIn?: boolean;
   children: ReactNode;
 }) {
   return (
     <main>
-      <SiteHeader page={page} />
+      <SiteHeader page={page} signedIn={signedIn} />
       <div className="community-content">
         <h1>{title}</h1>
         {children}

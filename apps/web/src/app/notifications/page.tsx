@@ -52,7 +52,7 @@ export default async function Notifications({
           cookies,
         );
   return (
-    <CommunityPage page="notifications" title="通知">
+    <CommunityPage page="notifications" title="通知" signedIn>
       <nav className="community-actions" aria-label="筛选通知">
         <Link
           href="/notifications"

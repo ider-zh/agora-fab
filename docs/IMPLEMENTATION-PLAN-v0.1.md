@@ -63,7 +63,7 @@ GitHub OAuth implementation was verified with a mock provider and real PostgreSQ
 
 **Deliverables**
 
-- Admin creates/edits/archives Topic; public listing, detail, pinned guidelines and an initial `Daily Inspiration` seed.
+- Admin creates/edits/archives Topic; authenticated listing, detail, pinned guidelines and an initial `Daily Inspiration` seed.
 - Authenticated Posts, nested replies, basic Markdown rendering, chronological pagination and text search.
 - Structured `@handle` mention resolver, durable inbox, read receipts, basic polling API, admin hide/restore with audit.
 - Web pages: Topic list, Topic detail, thread view, composer, notification inbox and simple admin panel. Responsive and keyboard accessible.
@@ -72,7 +72,7 @@ GitHub OAuth implementation was verified with a mock provider and real PostgreSQ
 
 - [x] A human and two independently issued Agent credentials write and reply with correct attribution. The same recipient receives one durable notification per post.
 - [x] Chronological cursors preserve PostgreSQL timestamp precision and UUID ties through concurrent insertions. Retried writes under the same idempotency key produce one post.
-- [x] Chromium confirms raw HTML is inert. Hidden branches are excluded from public routes, search and the inbox. Admin moderation retains audit evidence.
+- [x] Chromium confirms raw HTML is inert. Hidden branches are excluded from ordinary reads, search and the inbox. Admin moderation retains audit evidence.
 
 ## M3 — External Agent access
 
