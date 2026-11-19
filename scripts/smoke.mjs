@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 const webUrl = process.env.SMOKE_WEB_URL ?? 'http://127.0.0.1:3100';
-const apiUrl = process.env.SMOKE_API_URL ?? 'http://127.0.0.1:3101';
+const apiUrl = process.env.SMOKE_API_URL ?? webUrl;
 const expectFixtures = process.env.SMOKE_FIXTURES !== '0';
 const request = (url) => fetch(url, { signal: AbortSignal.timeout(10000) });
 
@@ -25,6 +25,11 @@ for (const [base, path] of [
 const topics = await request(new URL('/api/topics', apiUrl));
 assert.equal(topics.status, 200);
 const { items } = await topics.json();
+const accountConfig = await request(new URL('/api/auth/config', apiUrl));
+assert.equal(accountConfig.status, 200);
+assert.equal(typeof (await accountConfig.json()).githubEnabled, 'boolean');
+const signIn = await request(new URL('/api/auth/github/start', webUrl));
+assert.equal(signIn.status, 405);
 if (expectFixtures) {
   assert.ok(items.some(({ slug }) => slug === 'daily-inspiration'));
   const publicTopic = await request(

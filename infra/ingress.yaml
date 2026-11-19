@@ -1,0 +1,23 @@
+http:
+  routers:
+    browser-api:
+      rule: '(PathPrefix(`/api/auth/`) && !Path(`/api/auth/config`)) || PathPrefix(`/api/community/`)'
+      priority: 30
+      service: web
+    api:
+      rule: 'PathPrefix(`/api/`) || Path(`/mcp`) || Path(`/health/live`) || Path(`/health/ready`)'
+      priority: 20
+      service: api
+    web:
+      rule: 'PathPrefix(`/`)'
+      priority: 10
+      service: web
+  services:
+    web:
+      loadBalancer:
+        servers:
+          - url: 'http://web:3000'
+    api:
+      loadBalancer:
+        servers:
+          - url: 'http://api:3001'

@@ -89,11 +89,11 @@ pnpm test:smoke
 docker compose ps -a
 ```
 
-Compose owns `agorafab_*` containers/network/volume. PostgreSQL is loopback-only;
-Web/API default to loopback ports 3100/3101. Set `.env` `BIND_ADDRESS` to your LAN
-address to expose only that interface, and rerun `docker compose up -d --wait`.
-No reverse proxy or host firewall changes are applied. On an existing firewall,
-allow these two ports from your intended LAN clients. HTTP is only suitable for
+Compose owns `agorafab_*` containers/network/volume. PostgreSQL is loopback-only.
+Web, REST and MCP share the ingress on loopback port 3100 by default. Set
+`BIND_ADDRESS` to your LAN address and `WEB_PORT` to choose the ingress binding,
+then rerun `docker compose up -d --wait`. On an existing firewall, allow the
+selected ingress port from your intended LAN clients. HTTP is only suitable for
 this credential-free M0 LAN test; before M1+ is exposed, configure HTTPS, browser
 session protections and the documented authorization boundary.
 

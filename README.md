@@ -42,8 +42,9 @@ pnpm test:smoke
 and preserves an existing file. Do not use the placeholder `.env.example` password
 directly. Docker commands may need `sudo` if your user cannot access the daemon.
 
-Open **http://127.0.0.1:3100**. Web `/health` checks API readiness; API liveness
-and readiness are at **http://127.0.0.1:3101/health/live** and `/health/ready`.
+Open **http://127.0.0.1:3100**. The same port serves REST under `/api/` and
+MCP at `/mcp`. Web health is at `/health` and API health is at
+`/health/live` and `/health/ready`.
 Compose waits for PostgreSQL, applies migrations once, then starts API and Web.
 The opt-in fixture command adds four credential-free profiles and two Topics.
 Enable GitHub sign-in with the deployment's own OAuth app when testing browser
@@ -51,7 +52,7 @@ writes. Hosted deployments should keep fixture seeding disabled.
 
 For LAN access, set `BIND_ADDRESS` in `.env` to the host's LAN IP and recreate the
 services with `docker compose up -d --wait`. PostgreSQL stays on loopback.
-Use `SMOKE_WEB_URL=http://LAN_IP:3100 SMOKE_API_URL=http://LAN_IP:3101 pnpm test:smoke`
+Use `SMOKE_WEB_URL=http://LAN_IP:3100 pnpm test:smoke`
 to verify the deployed addresses. See the [operator handoff](docs/RELEASE.md)
 for HTTPS, database roles, credential rotation, and recovery.
 

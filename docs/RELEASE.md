@@ -1,9 +1,8 @@
 # AgoraFab V0.1 operator handoff
 
-The LAN test service is at [http://192.168.1.220:3100](http://192.168.1.220:3100).
-Native MCP discovery and public reads use `http://192.168.1.220:3101/mcp`. GitHub
-sign-in on this instance is disabled until a deployment-owned OAuth app and HTTPS
-callback origin are configured. A public production launch is pending.
+The LAN test service is at [http://192.168.1.220:43187](http://192.168.1.220:43187).
+REST routes under `/api/` and native MCP at `/mcp` use the same address.
+GitHub sign-in on this instance is disabled. A public production launch is pending.
 
 ## Start from a clean clone
 
@@ -42,51 +41,41 @@ node scripts/smoke.mjs
 ```
 
 To reproduce the LAN configuration, set `BIND_ADDRESS` to the host's LAN IPv4
-address. The default Web and API ports are 3100 and 3101, and their public URLs
-follow the configured bind address and ports unless overridden. PostgreSQL's
-published port remains on loopback. See [development setup](DEVELOPMENT.md) for
-network build workarounds and local test commands.
+address and set `WEB_PORT=43187`. Compose publishes the shared ingress only.
+The API and Web containers are reached through Docker's private network.
+PostgreSQL's published port remains on loopback. The default ingress port
+for a fresh installation is 3100. See [development setup](DEVELOPMENT.md)
+for network build workarounds and local test commands.
 
 ## Configure a production origin
 
-Keep `BIND_ADDRESS=127.0.0.1` on the Compose host. Put a reverse proxy with a valid
-TLS certificate in front of Web and the MCP gateway. For example, use the
-following variables for `https://forum.example.org` and register
-`https://forum.example.org/api/auth/github/callback` in the deployment's GitHub
-OAuth app. Enter real credentials only in the private environment file.
+For a reverse proxy running on the Compose host, bind the ingress to loopback.
+Set the canonical Web origin to the domain served by the proxy. MCP defaults to
+`/mcp` on that origin.
 
 ```dotenv
 BIND_ADDRESS=127.0.0.1
-AUTH_PUBLIC_ORIGIN=https://forum.example.org
+WEB_PORT=43187
 WEB_PUBLIC_ORIGIN=https://forum.example.org
-MCP_PUBLIC_URL=https://forum.example.org/mcp
 MCP_ALLOWED_ORIGINS=
 ```
 
-Set `GITHUB_OAUTH_CLIENT_ID`, `GITHUB_OAUTH_CLIENT_SECRET`, and the numeric
-`GITHUB_ADMIN_IDS` allowlist. Use the same canonical origin for auth and Web, with
-no trailing slash. Native MCP clients can omit `Origin`. If an approved browser
-client requires MCP, add its exact origin to the comma-separated
-`MCP_ALLOWED_ORIGINS`. See
-[identity configuration](IDENTITY.md) and [MCP setup](MCP.md).
+Use the same canonical origin for Web and any enabled browser authentication,
+with no trailing slash. Native MCP clients can omit `Origin`. If an approved
+browser client requires MCP, add its exact origin to the comma-separated
+`MCP_ALLOWED_ORIGINS`. See [identity configuration](IDENTITY.md) and
+[MCP setup](MCP.md).
 
-Inside the HTTPS virtual host, forward `/mcp` to the API and other paths to Web.
-Preserve the original Host on `/mcp` so it matches the configured public endpoint.
-Web forwards the browser's original `Origin` for authenticated mutations.
+Inside the HTTPS virtual host, forward all paths to the shared ingress.
+Preserve the original Host so MCP requests match the configured public endpoint.
+The gateway routes browser forms through Web and forwards REST and MCP to the API.
 
 ```nginx
-location = /mcp {
-    proxy_pass http://127.0.0.1:3101;
-    proxy_http_version 1.1;
-    proxy_set_header Host $http_host;
-}
-
 location / {
-    proxy_pass http://127.0.0.1:3100;
+    proxy_pass http://127.0.0.1:43187;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
-    proxy_set_header X-Forwarded-Host $http_host;
-    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_buffering off;
 }
 ```
 
