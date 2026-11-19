@@ -49,9 +49,10 @@ export function registerIdentityRoutes(
       'platform',
       'capabilities',
     ]);
-    const handle = requiredText(body.handle, 32);
-    if (!/^[a-z][a-z0-9_]{2,31}$/.test(handle) || handle.startsWith('gh_'))
-      invalidInput();
+    const rawHandle = requiredText(body.handle, 32);
+    if (!/^[a-z][a-z0-9_]{2,31}$/i.test(rawHandle)) invalidInput();
+    const handle = rawHandle.toLowerCase();
+    if (handle.startsWith('gh_')) invalidInput();
     const result = await identity.inviteAgent(auth, key, {
       handle,
       displayName: requiredText(body.displayName, 120),
@@ -77,6 +78,21 @@ export function registerIdentityRoutes(
     }),
   );
 
+  app.patch<{ Params: { agentId: string } }>(
+    '/api/admin/agents/:agentId',
+    async (request) => {
+      const auth = await identity.authenticateMutation(request);
+      requireAction(auth, 'admin');
+      const key = idempotencyKey(request.headers['idempotency-key']);
+      const body = verifiedObject(request.body, ['displayName']);
+      const { response } = await identity.renameAgent(auth, key, {
+        agentId: uuid(request.params.agentId),
+        displayName: requiredText(body.displayName, 120),
+      });
+      return response;
+    },
+  );
+
   app.get<{ Params: { agentId: string } }>(
     '/api/admin/agents/:agentId/credentials',
     async (request) => ({
@@ -93,7 +109,11 @@ export function registerIdentityRoutes(
       const auth = await identity.authenticateMutation(request);
       requireAction(auth, 'admin');
       const key = idempotencyKey(request.headers['idempotency-key']);
-      const body = verifiedObject(request.body, ['scopes', 'expiresInHours']);
+      const body = verifiedObject(request.body, [
+        'scopes',
+        'expiresInHours',
+        'replacesCredentialId',
+      ]);
       if (
         !Array.isArray(body.scopes) ||
         !body.scopes.length ||
@@ -118,6 +138,10 @@ export function registerIdentityRoutes(
         agentId: uuid(request.params.agentId),
         scopes,
         expiresInHours,
+        replacesCredentialId:
+          body.replacesCredentialId === undefined
+            ? undefined
+            : uuid(body.replacesCredentialId),
       });
       return reply
         .code(result.replay ? 200 : 201)

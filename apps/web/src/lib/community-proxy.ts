@@ -17,7 +17,7 @@ function jsonError(status: number, code: string) {
   );
 }
 
-function mutationFor(segments: readonly string[]) {
+function allowedMutations(segments: readonly string[]) {
   const [first, second = '', third, fourth, fifth] = segments;
   if (segments.length === 3) {
     if (
@@ -26,41 +26,41 @@ function mutationFor(segments: readonly string[]) {
       (uuid.test(second) || slug.test(second)) &&
       third === 'posts'
     )
-      return 'POST';
+      return ['POST'];
     if (first === 'posts' && uuid.test(second) && third === 'replies')
-      return 'POST';
+      return ['POST'];
     if (first === 'me' && second === 'notifications' && uuid.test(third ?? ''))
-      return 'PATCH';
+      return ['PATCH'];
     if (first === 'admin' && second === 'topics' && uuid.test(third ?? ''))
-      return 'PATCH';
+      return ['PATCH'];
     if (first === 'projects' && uuid.test(second) && third === 'tasks')
-      return 'POST';
+      return ['POST'];
     if (
       first === 'tasks' &&
       uuid.test(second) &&
       ['claim', 'artifacts', 'review'].includes(third ?? '')
     )
-      return 'POST';
+      return ['POST'];
     if (first === 'admin' && second === 'tasks' && uuid.test(third ?? ''))
-      return 'PATCH';
+      return ['PATCH'];
     if (first === 'admin' && second === 'agents' && uuid.test(third ?? ''))
-      return 'DELETE';
+      return ['PATCH', 'DELETE'];
   }
   if (
     segments.length === 2 &&
     first === 'admin' &&
     ['topics', 'agents', 'humans'].includes(second)
   )
-    return 'POST';
+    return ['POST'];
   if (segments.length === 4 && first === 'admin' && uuid.test(third ?? '')) {
     if (
       second === 'posts' &&
       ['hide', 'restore', 'pin', 'unpin', 'promote'].includes(fourth ?? '')
     )
-      return 'POST';
-    if (second === 'projects' && fourth === 'tasks') return 'POST';
-    if (second === 'tasks' && fourth === 'review') return 'POST';
-    if (second === 'agents' && fourth === 'credentials') return 'POST';
+      return ['POST'];
+    if (second === 'projects' && fourth === 'tasks') return ['POST'];
+    if (second === 'tasks' && fourth === 'review') return ['POST'];
+    if (second === 'agents' && fourth === 'credentials') return ['POST'];
   }
   if (
     segments.length === 5 &&
@@ -70,16 +70,17 @@ function mutationFor(segments: readonly string[]) {
     fourth === 'credentials' &&
     uuid.test(fifth ?? '')
   )
-    return 'DELETE';
+    return ['DELETE'];
 }
 
 export async function proxyCommunity(request: Request, segments: string[]) {
-  const method = mutationFor(segments);
-  if (!method) return jsonError(404, 'NOT_FOUND');
-  if (request.method !== method)
+  const methods = allowedMutations(segments);
+  if (!methods) return jsonError(404, 'NOT_FOUND');
+  const method = request.method;
+  if (!methods.includes(method))
     return new Response(null, {
       status: 405,
-      headers: { ...responseHeaders, Allow: method },
+      headers: { ...responseHeaders, Allow: methods.join(', ') },
     });
 
   const origin = request.headers.get('origin');

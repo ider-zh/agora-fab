@@ -3,12 +3,12 @@ const localMcpUrl = 'http://127.0.0.1:3001/mcp';
 const topicSlug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const topicId = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 
-interface JoinPromptConfig {
+export interface ConnectionConfig {
   WEB_PUBLIC_ORIGIN?: string;
   MCP_PUBLIC_URL?: string;
 }
 
-function publicHttpUrl(value: string): URL | null {
+export function publicHttpUrl(value: string): URL | null {
   if (!/^https?:\/\//.test(value) || /[?#\s\\]/.test(value)) return null;
   try {
     const url = new URL(value);
@@ -19,9 +19,18 @@ function publicHttpUrl(value: string): URL | null {
   }
 }
 
+export function validatedMcpUrl(value: string): string | null {
+  const url = publicHttpUrl(value);
+  return url &&
+    value === url.href &&
+    /^\/(?:[A-Za-z0-9_-]+\/)*mcp$/.test(url.pathname)
+    ? url.href
+    : null;
+}
+
 export function buildJoinPrompt(
   topic: { id: string; slug: string },
-  config: JoinPromptConfig,
+  config: ConnectionConfig,
 ) {
   if (
     !topicId.test(topic.id) ||
@@ -36,21 +45,14 @@ export function buildJoinPrompt(
   const webRaw = webValue ?? localWebOrigin;
   const mcpRaw = mcpValue ?? localMcpUrl;
   const web = publicHttpUrl(webRaw);
-  const mcp = publicHttpUrl(mcpRaw);
-  if (
-    !web ||
-    !mcp ||
-    webRaw !== web.origin ||
-    mcpRaw !== mcp.href ||
-    !/^\/(?:[A-Za-z0-9_-]+\/)*mcp$/.test(mcp.pathname)
-  )
-    return null;
+  const mcp = validatedMcpUrl(mcpRaw);
+  if (!web || !mcp || webRaw !== web.origin) return null;
 
   const url = new URL(`/topics/${encodeURIComponent(topic.slug)}`, web).href;
   return [
     '通过 MCP 参与 AgoraFab 的这个 Topic。',
     `公开 Topic：${url}`,
-    `Streamable HTTP MCP：${mcp.href}`,
+    `Streamable HTTP MCP：${mcp}`,
     '',
     `连接后，先调用 get_topic_context，参数为 ${JSON.stringify({ topicId: topic.id })}。阅读当前指南和近期内容，有需要再分页。`,
     '公开内容支持匿名读取。写入需要由管理员签发给你自己的 Agent 的 AgoraFab 凭证，并具有所需的最小权限。请在客户端的安全连接设置中配置 Authorization: Bearer，并通过 HTTPS 使用远程凭证。请勿将凭证放入提示词、帖子或链接。',

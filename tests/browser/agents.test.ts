@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { checkPage } from './accessibility.js';
-import { browserFixture, signIn } from './fixture.js';
+import { browserFixture, screenshot, signIn } from './fixture.js';
 
 let fixture: Awaited<ReturnType<typeof browserFixture>>;
 beforeAll(async () => {
@@ -14,7 +14,10 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
   const { browser, origin } = fixture;
   const [owner, adminContext] = await Promise.all([
     browser.newPage(),
-    browser.newContext({ viewport: { width: 390, height: 844 } }),
+    browser.newContext({
+      viewport: { width: 390, height: 844 },
+      permissions: ['clipboard-read', 'clipboard-write'],
+    }),
   ]);
   const admin = await adminContext.newPage();
   owner.setDefaultTimeout(10_000);
@@ -51,6 +54,18 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
     if (!principalId)
       throw new Error('Agent detail did not expose its Principal ID.');
     await admin.getByText(principalId, { exact: true }).waitFor();
+    const rename = admin.getByRole('form', { name: '修改 Agent 名称' });
+    await rename.getByLabel('显示名称').fill('Renamed QA Agent');
+    await rename.getByRole('button', { name: '保存名称' }).click();
+    await admin.getByRole('heading', { name: 'Renamed QA Agent' }).waitFor();
+    expect(admin.url().endsWith(`/${principalId}`)).toBe(true);
+    await admin.getByText(/@mobile_qa_agent/).waitFor();
+
+    await owner.goto(admin.url());
+    expect(
+      await owner.getByRole('form', { name: '修改 Agent 名称' }).count(),
+    ).toBe(0);
+    expect(await owner.getByRole('form', { name: '签发凭证' }).count()).toBe(0);
 
     const issue = admin.getByRole('form', { name: '签发凭证' });
     await issue.getByRole('checkbox', { name: 'community:write' }).check();
@@ -58,7 +73,7 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
     await issue.getByLabel('有效期（小时）').fill('2');
     await issue.getByRole('button', { name: '签发凭证' }).click();
     const secret = admin.getByRole('textbox', {
-      name: 'Agent 凭证',
+      name: 'Agent 私密 MCP 接入提示词',
       exact: true,
     });
     await secret.waitFor();
@@ -71,14 +86,35 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
           readOnly?: boolean;
           value?: string;
         };
+        const value = control.value ?? '';
         return (
           control.tagName === 'TEXTAREA' &&
           control.readOnly === true &&
-          /^agf_[A-Za-z0-9_-]{43}$/.test(control.value ?? '')
+          /^Authorization: Bearer agf_[A-Za-z0-9_-]{43}$/m.test(value) &&
+          value.includes('Streamable HTTP MCP：http://127.0.0.1:3001/mcp') &&
+          value.includes('@mobile_qa_agent') &&
+          value.includes('新人报道区') &&
+          value.includes('create_post')
         );
       }),
     ).toBe(true);
-    await admin.getByRole('button', { name: '关闭凭证显示' }).click();
+    await admin.getByRole('button', { name: '复制接入提示词' }).click();
+    await admin.getByText('接入提示词已复制。').waitFor();
+    expect(
+      await secret.evaluate(async (element) => {
+        const { clipboard } = navigator as unknown as {
+          clipboard: {
+            readText(): Promise<string>;
+            writeText(text: string): Promise<void>;
+          };
+        };
+        const same =
+          (await clipboard.readText()) === (element as { value: string }).value;
+        await clipboard.writeText('');
+        return same;
+      }),
+    ).toBe(true);
+    await admin.getByRole('button', { name: '关闭接入提示词显示' }).click();
     await secret.waitFor({ state: 'hidden' });
     await admin.reload();
     expect(await secret.count()).toBe(0);
@@ -101,11 +137,23 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
       .waitFor();
     await metadata.getByText('有效', { exact: true }).waitFor();
     await checkPage(admin, 'Agent credential metadata');
+    await screenshot(admin, 'agent-management-metadata');
+    const rotate = issue.getByLabel('更换已有凭证（选填）');
+    await rotate.selectOption({ index: 1 });
+    expect(
+      await issue
+        .getByRole('checkbox', { name: 'notifications:read' })
+        .isChecked(),
+    ).toBe(true);
+    await issue.getByRole('button', { name: '签发凭证' }).click();
+    await secret.waitFor();
+    await admin.getByRole('button', { name: '关闭接入提示词显示' }).click();
+    await metadata.getByText('已撤销', { exact: true }).waitFor();
     await revoke.click();
     await revoke.waitFor({ state: 'hidden' });
     await admin.reload();
     expect(await revoke.count()).toBe(0);
-    await metadata.getByText('已撤销', { exact: true }).waitFor();
+    expect(await metadata.getByText('已撤销', { exact: true }).count()).toBe(2);
 
     await admin.getByText('撤销整个 Agent', { exact: true }).click();
     await admin

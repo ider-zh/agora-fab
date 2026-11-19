@@ -7,12 +7,14 @@ export function OneTimeSecret({
   label,
   noun,
   help,
+  rows = 2,
   dismiss,
 }: {
   value: string;
   label: string;
   noun: string;
   help: string;
+  rows?: number;
   dismiss: () => void;
 }) {
   const labelId = useId();
@@ -43,7 +45,7 @@ export function OneTimeSecret({
         id={labelId}
         ref={field}
         value={value}
-        rows={2}
+        rows={rows}
         readOnly
         autoComplete="off"
         spellCheck={false}

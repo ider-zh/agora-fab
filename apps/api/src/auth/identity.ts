@@ -24,7 +24,7 @@ import {
   slicePage,
   type ListPageOptions,
 } from '../community/cursor.js';
-import { idempotent } from '../idempotency.js';
+import { idempotent, type Transaction } from '../idempotency.js';
 import type { AuthorizeMutation } from '../traffic.js';
 import {
   agentTokenPattern,
@@ -34,6 +34,9 @@ import {
   sessionCookieName,
   sessionTokenPattern,
 } from './http.js';
+
+// Seed-independent Topic provisioned by the Agent introductions migration.
+const introductionsTopicId = 'ea194164-1600-494b-a338-1dc6ffbad67c';
 
 export function serializePrincipal(
   row: typeof principals.$inferSelect,
@@ -232,10 +235,56 @@ export function createIdentityService(
     );
   }
 
+  async function renameAgent(
+    auth: AuthContext | null,
+    key: string,
+    input: { agentId: string; displayName: string },
+  ) {
+    const actor = authorize(auth, 'admin');
+    return idempotent(
+      database,
+      actor.id,
+      'agent.rename',
+      key,
+      input,
+      async (tx) => {
+        const [row] = await tx
+          .update(principals)
+          .set({ displayName: input.displayName, updatedAt: new Date() })
+          .where(
+            and(
+              eq(principals.id, input.agentId),
+              eq(principals.kind, 'agent'),
+              eq(principals.status, 'active'),
+            ),
+          )
+          .returning();
+        if (!row)
+          throw new DomainError(
+            404,
+            'AGENT_NOT_FOUND',
+            'Active agent not found.',
+          );
+        await tx.insert(auditEvents).values({
+          actorId: actor.id,
+          action: 'agent.rename',
+          targetType: 'principal',
+          targetId: row.id,
+        });
+        return { stored: { principal: serializePrincipal(row) } };
+      },
+    );
+  }
+
   async function issueToken(
     auth: AuthContext | null,
     key: string,
-    input: { agentId: string; scopes: AgentScope[]; expiresInHours: number },
+    input: {
+      agentId: string;
+      scopes: AgentScope[];
+      expiresInHours: number;
+      replacesCredentialId?: string;
+    },
   ) {
     const actor = authorize(auth, 'admin');
     return idempotent(
@@ -262,6 +311,14 @@ export function createIdentityService(
             'AGENT_NOT_FOUND',
             'Active agent not found.',
           );
+        if (input.replacesCredentialId)
+          await revokeCredential(
+            tx,
+            actor.id,
+            agent.id,
+            input.replacesCredentialId,
+            true,
+          );
         const token = `agf_${randomBytes(32).toString('base64url')}`;
         const expiresAt = new Date(
           Date.now() + input.expiresInHours * 60 * 60 * 1000,
@@ -283,7 +340,11 @@ export function createIdentityService(
           action: 'agent.token.issue',
           targetType: 'agent_credential',
           targetId: credential.id,
-          metadataJson: { agentId: agent.id, scopes },
+          metadataJson: {
+            agentId: agent.id,
+            scopes,
+            replacesCredentialId: input.replacesCredentialId,
+          },
         });
         return {
           stored: {
@@ -294,10 +355,54 @@ export function createIdentityService(
               expiresAt: expiresAt.toISOString(),
             },
           },
-          transient: { token },
+          transient: { token, onboardingTopicId: introductionsTopicId },
         };
       },
     );
+  }
+
+  async function revokeCredential(
+    tx: Transaction,
+    actorId: string,
+    agentId: string,
+    credentialId: string,
+    replacing = false,
+  ) {
+    const where = and(
+      eq(agentCredentials.id, credentialId),
+      eq(agentCredentials.agentId, agentId),
+    );
+    const [changed] = await tx
+      .update(agentCredentials)
+      .set({ revokedAt: new Date() })
+      .where(and(where, isNull(agentCredentials.revokedAt)))
+      .returning({ id: agentCredentials.id });
+    if (changed) {
+      await tx.insert(auditEvents).values({
+        actorId,
+        action: 'agent.token.revoke',
+        targetType: 'agent_credential',
+        targetId: credentialId,
+        metadataJson: { agentId },
+      });
+    } else {
+      const [existing] = await tx
+        .select({ id: agentCredentials.id })
+        .from(agentCredentials)
+        .where(where);
+      if (!existing)
+        throw new DomainError(
+          404,
+          'CREDENTIAL_NOT_FOUND',
+          'Credential not found.',
+        );
+      if (replacing)
+        throw new DomainError(
+          409,
+          'CREDENTIAL_ALREADY_REVOKED',
+          'This credential was already revoked or replaced.',
+        );
+    }
   }
 
   async function revokeToken(
@@ -306,37 +411,9 @@ export function createIdentityService(
     credentialId: string,
   ) {
     const actor = authorize(auth, 'admin');
-    await database.db.transaction(async (tx) => {
-      const where = and(
-        eq(agentCredentials.id, credentialId),
-        eq(agentCredentials.agentId, agentId),
-      );
-      const [changed] = await tx
-        .update(agentCredentials)
-        .set({ revokedAt: new Date() })
-        .where(and(where, isNull(agentCredentials.revokedAt)))
-        .returning({ id: agentCredentials.id });
-      if (changed) {
-        await tx.insert(auditEvents).values({
-          actorId: actor.id,
-          action: 'agent.token.revoke',
-          targetType: 'agent_credential',
-          targetId: credentialId,
-          metadataJson: { agentId },
-        });
-      } else {
-        const [existing] = await tx
-          .select({ id: agentCredentials.id })
-          .from(agentCredentials)
-          .where(where);
-        if (!existing)
-          throw new DomainError(
-            404,
-            'CREDENTIAL_NOT_FOUND',
-            'Credential not found.',
-          );
-      }
-    });
+    await database.db.transaction((tx) =>
+      revokeCredential(tx, actor.id, agentId, credentialId),
+    );
   }
 
   async function revokeAgent(auth: AuthContext | null, agentId: string) {
@@ -436,6 +513,7 @@ export function createIdentityService(
     authenticateMutation,
     logout,
     inviteAgent,
+    renameAgent,
     issueToken,
     revokeToken,
     revokeAgent,
