@@ -116,6 +116,46 @@ h1 {
   max-width: 640px;
   padding: 44px 0;
 }
+.account-dashboard {
+  max-width: none;
+}
+.account-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  align-items: start;
+  gap: 20px;
+  margin-top: 18px;
+}
+.account-dashboard-tools {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.account-dashboard-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 135px), 1fr));
+  gap: 12px;
+  padding: 0;
+  margin: 16px 0 0;
+  list-style: none;
+}
+.account-dashboard-links a {
+  display: block;
+  border: 1px solid #dbe1d8;
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--green);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+.account-dashboard-links a:hover {
+  background: #f0f6ef;
+}
+@media (max-width: 720px) {
+  .account-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .account-card {
   padding: clamp(20px, 5vw, 32px);
   border: 1px solid #dbe1d8;

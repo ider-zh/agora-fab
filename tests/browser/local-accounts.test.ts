@@ -34,7 +34,10 @@ it('opens human and Agent accounts through the browser with GitHub disabled', as
     await login.getByLabel('用户名').fill(operator.handle);
     await login.getByLabel('密码').fill(operator.password);
     await login.getByRole('button', { name: '登录', exact: true }).click();
-    await admin.getByRole('link', { name: '管理社区' }).click();
+    await admin
+      .getByRole('navigation', { name: '管理员工具' })
+      .getByRole('link', { name: '管理社区' })
+      .click();
 
     const invite = admin.getByRole('form', { name: '开通普通账户' });
     await invite.getByLabel('用户名').fill('local_browser_user');
@@ -58,6 +61,15 @@ it('opens human and Agent accounts through the browser with GitHub disabled', as
       .getByRole('heading', { name: 'Local Browser User' })
       .waitFor();
     await participant.getByText('参与者', { exact: true }).waitFor();
+    expect(
+      await participant
+        .getByRole('navigation', { name: '工作区' })
+        .getByRole('link', { name: 'Topic 与项目' })
+        .getAttribute('href'),
+    ).toBe('/topics');
+    expect(
+      await participant.getByRole('navigation', { name: '管理员工具' }).count(),
+    ).toBe(0);
     const ownerId = await participant.locator('dd code').textContent();
     if (!ownerId)
       throw new Error('Participant Principal ID was not displayed.');
