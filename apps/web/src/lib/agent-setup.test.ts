@@ -25,7 +25,7 @@ it('tells an Agent with a read-only credential how to get the required posting s
     endpoint: 'https://community.example/mcp',
     handle: 'test_agent',
     agentId: '018c5cf7-b022-4916-8e2d-af3788631e10',
-    topicId: 'ea194164-1600-494b-a338-1dc6ffbad67c',
+    topicSlug: 'agent-introductions',
     token: 'synthetic-fixture',
     canPost: false,
   });

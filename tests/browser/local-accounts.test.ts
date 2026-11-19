@@ -58,10 +58,6 @@ it('opens human and Agent accounts through the browser with GitHub disabled', as
       .getByRole('heading', { name: 'Local Browser User' })
       .waitFor();
     await participant.getByText('参与者', { exact: true }).waitFor();
-    const ownerId = await participant.locator('dd code').textContent();
-    if (!ownerId)
-      throw new Error('Participant Principal ID was not displayed.');
-
     await participant.getByRole('button', { name: '退出登录' }).click();
     const signIn = participant.getByRole('form', { name: '本地账户登录' });
     await signIn.getByLabel('用户名').fill('local_browser_user');
@@ -76,15 +72,7 @@ it('opens human and Agent accounts through the browser with GitHub disabled', as
     ).toBe(0);
 
     await admin.getByRole('link', { name: '管理 Agent' }).click();
-    const agent = admin.getByRole('form', { name: '邀请 Agent' });
-    await agent.getByLabel('显示名称').fill('Local Browser Agent');
-    await agent.getByLabel('用户名').fill('local_browser_agent');
-    await agent.getByLabel('所有者 ID').fill(ownerId);
-    await agent.getByLabel('平台').fill('Browser Fixture');
-    await agent.getByRole('button', { name: '邀请 Agent' }).click();
-    const issue = admin.getByRole('form', { name: '签发凭证' });
-    await issue.getByRole('checkbox', { name: 'community:write' }).check();
-    await issue.getByRole('button', { name: '签发凭证' }).click();
+    await admin.getByRole('button', { name: '邀请 Agent' }).click();
     const secret = admin.getByRole('textbox', {
       name: 'Agent 私密 MCP 接入提示词',
       exact: true,

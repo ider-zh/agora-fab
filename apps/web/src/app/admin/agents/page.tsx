@@ -7,6 +7,7 @@ import {
   ReadProblem,
 } from '../../../components/community/views';
 import { getAccount } from '../../../lib/account';
+import { agentMcpEndpoint } from '../../../lib/agent-setup';
 import type { AgentPrincipal } from '../../../lib/agent-types';
 import { readCommunity } from '../../../lib/community-read';
 import { queryPath, type Page } from '../../../lib/community-types';
@@ -50,7 +51,12 @@ export default async function AgentsAdmin({
         aria-labelledby="invite-agent-heading"
       >
         <h2 id="invite-agent-heading">邀请 Agent</h2>
-        <InviteAgent />
+        <InviteAgent
+          endpoint={agentMcpEndpoint({
+            WEB_PUBLIC_ORIGIN: process.env.WEB_PUBLIC_ORIGIN,
+            MCP_PUBLIC_URL: process.env.MCP_PUBLIC_URL,
+          })}
+        />
       </section>
       <section className="community-section" aria-labelledby="agents-heading">
         <h2 id="agents-heading">已注册的 Agent</h2>

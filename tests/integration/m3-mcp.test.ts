@@ -227,6 +227,218 @@ describe('official SDK clients over Streamable HTTP', () => {
     });
   });
 
+  it('automatically invites independent Agents and gives plaintext only to the winning request', async () => {
+    const { app, admin, human, database } = fixture;
+    const url = '/api/admin/agents';
+    const key = randomUUID();
+    const request = { method: 'POST' as const, url, payload: {} };
+    const agentHeaders = await fixture.issue(fixture.fixtureIds.agentA, [
+      'community:write',
+    ]);
+    for (const [headers, status] of [
+      [{}, 401],
+      [human, 403],
+      [agentHeaders, 403],
+      [{ ...admin, origin: 'https://other.example' }, 403],
+    ] as const) {
+      expect(
+        (
+          await app.inject({
+            ...request,
+            headers: { ...headers, 'idempotency-key': key },
+          })
+        ).statusCode,
+      ).toBe(status);
+    }
+    expect((await app.inject({ ...request, headers: admin })).statusCode).toBe(
+      400,
+    );
+    const headers = { ...admin, 'idempotency-key': key };
+    const [first, replay, second] = await Promise.all([
+      app.inject({ ...request, headers }),
+      app.inject({ ...request, headers }),
+      app.inject({
+        method: 'POST',
+        url,
+        headers: { ...admin, 'idempotency-key': randomUUID() },
+      }),
+    ]).then(([a, b, c]) =>
+      a.statusCode === 201 ? ([a, b, c] as const) : ([b, a, c] as const),
+    );
+    expect([first.statusCode, replay.statusCode, second.statusCode]).toEqual([
+      201, 200, 201,
+    ]);
+    expect(first.headers['cache-control']).toBe('no-store');
+    expect(first.headers.location).toBeUndefined();
+    const { principal, credential, token, onboardingTopicSlug } = first.json<{
+      principal: { id: string; handle: string; displayName: string };
+      credential: {
+        id: string;
+        agentId: string;
+        expiresAt: string;
+        scopes: string[];
+      };
+      token: string;
+      onboardingTopicSlug: string;
+    }>();
+    const adminId = (
+      await app.inject({ url: '/api/me', headers: admin })
+    ).json().principal.id;
+    expect(principal).toMatchObject({
+      handle: expect.stringMatching(/^agent_[a-f0-9]{10}$/),
+      displayName: `Agent ${principal.handle.slice(6).toUpperCase()}`,
+      kind: 'agent',
+      role: 'participant',
+      status: 'active',
+      ownerPrincipalId: adminId,
+      platform: 'MCP',
+      capabilities: [],
+    });
+    expect(credential).toMatchObject({
+      agentId: principal.id,
+      scopes: ['community:write'],
+    });
+    expect(Date.parse(credential.expiresAt) - Date.now()).toBeGreaterThan(
+      167 * 60 * 60 * 1000,
+    );
+    expect(replay.json()).toEqual({ principal, credential });
+    const other = second.json<{
+      principal: typeof principal;
+      token: string;
+    }>();
+    expect(other.principal.id).not.toBe(principal.id);
+    expect(other.principal.handle).not.toBe(principal.handle);
+    expect(other.token !== token).toBe(true);
+    expect(
+      (
+        await app.inject({
+          ...request,
+          headers,
+          payload: {
+            handle: 'same_key',
+            displayName: 'Same key',
+            ownerPrincipalId: adminId,
+            platform: 'MCP',
+          },
+        })
+      ).statusCode,
+    ).toBe(409);
+
+    const persisted = await database.pool.query(
+      'select id, token_hash, created_by from agent_credentials where agent_id = $1',
+      [principal.id],
+    );
+    expect(
+      persisted.rows.map(({ id, created_by }) => ({ id, created_by })),
+    ).toEqual([{ id: credential.id, created_by: adminId }]);
+    expect(persisted.rows[0].token_hash === digest(token)).toBe(true);
+    const records = await database.pool.query(
+      'select response_json from idempotency_records where principal_id = $1 and key = $2',
+      [adminId, key],
+    );
+    expect(records.rows).toEqual([
+      { response_json: { principal, credential } },
+    ]);
+    const events = await database.pool.query(
+      'select action, actor_id, metadata_json from audit_events where target_id in ($1, $2) order by action',
+      [principal.id, credential.id],
+    );
+    expect(events.rows).toEqual([
+      { action: 'agent.invite', actor_id: adminId, metadata_json: {} },
+      {
+        action: 'agent.token.issue',
+        actor_id: adminId,
+        metadata_json: { agentId: principal.id, scopes: credential.scopes },
+      },
+    ]);
+    const listing = await app.inject({
+      url: `${url}/${principal.id}/credentials`,
+      headers: admin,
+    });
+    expect(listing.json().credentials).toEqual([
+      expect.objectContaining({ id: credential.id }),
+    ]);
+    expect(
+      listing.body.includes(token) || listing.body.includes(digest(token)),
+    ).toBe(false);
+
+    const prompt = buildAgentSetup({
+      endpoint: endpoint.href,
+      handle: principal.handle,
+      agentId: principal.id,
+      topicSlug: onboardingTopicSlug,
+      token,
+      canPost: true,
+    });
+    const promptTopic = /get_topic_context（topicId: ([a-z0-9-]+)）/.exec(
+      prompt,
+    )?.[1];
+    expect(promptTopic).toBe('agent-introductions');
+    const introductionKey = `onboarding:${principal.id}`;
+    expect(prompt.includes(introductionKey)).toBe(true);
+    await withClient({ authorization: `Bearer ${token}` }, async (client) => {
+      const topic = (
+        await tool(client, 'get_topic_context', { topicId: promptTopic })
+      ).structuredContent?.topic;
+      expect(topic).toMatchObject({ slug: promptTopic, title: '新人报道区' });
+      const canonicalId = (topic as { id: string }).id;
+      expect(
+        (await tool(client, 'get_topic_context', { topicId: canonicalId }))
+          .structuredContent?.topic,
+      ).toEqual(topic);
+      const input = {
+        topicId: promptTopic,
+        bodyMd: 'Hello from a newly invited Agent.',
+        idempotencyKey: introductionKey,
+        kind: 'discussion',
+      };
+      const post = expectPost(
+        await tool(client, 'create_post', input),
+        principal.id,
+      );
+      expect(post).toMatchObject({ topicId: canonicalId });
+      const retry = expectPost(
+        await tool(client, 'create_post', { ...input, topicId: canonicalId }),
+        principal.id,
+      );
+      expect(retry.id).toBe(post.id);
+      expectToolError(
+        await tool(client, 'get_notifications'),
+        'INSUFFICIENT_SCOPE',
+      );
+    });
+  }, 15_000);
+
+  it('rolls back the invitation when the initial credential cannot be created', async () => {
+    const { app, admin, database } = fixture;
+    const request = {
+      method: 'POST' as const,
+      url: '/api/admin/agents',
+      headers: { ...admin, 'idempotency-key': randomUUID() },
+      payload: {},
+    };
+    const state = () =>
+      database.pool.query(
+        `select (select count(*) from principals) as principals,
+              (select count(*) from agent_credentials) as credentials,
+              (select count(*) from audit_events) as audit_events,
+              (select count(*) from idempotency_records) as idempotency_records`,
+      );
+    const before = await state();
+    await database.pool.query(
+      'alter table agent_credentials add constraint simulate_credential_failure check (false) not valid',
+    );
+    try {
+      expect((await app.inject(request)).statusCode).toBe(500);
+      expect((await state()).rows).toEqual(before.rows);
+    } finally {
+      await database.pool.query(
+        'alter table agent_credentials drop constraint simulate_credential_failure',
+      );
+    }
+    expect((await app.inject(request)).statusCode).toBe(201);
+  });
+
   it('onboards separate Agents and preserves attribution through rename, token rotation and Agent revocation', async () => {
     const { app, admin, human, database } = fixture;
     const agentsUrl = '/api/admin/agents';
@@ -247,6 +459,7 @@ describe('official SDK clients over Streamable HTTP', () => {
     const agent = first.json<{ principal: { id: string; handle: string } }>()
       .principal;
     expect(agent.handle).toBe('intro_agent_a');
+    expect(Object.keys(first.json())).toEqual(['principal']);
     expect(
       (
         await app.inject({
@@ -279,11 +492,13 @@ describe('official SDK clients over Streamable HTTP', () => {
     const issued = await app.inject(tokenRequest);
     expect(issued.statusCode).toBe(201);
     expect(issued.headers['cache-control']).toBe('no-store');
-    const { token, onboardingTopicId, credential } = issued.json<{
-      token: string;
-      onboardingTopicId: string;
-      credential: { id: string };
-    }>();
+    const { token, onboardingTopicId, onboardingTopicSlug, credential } =
+      issued.json<{
+        token: string;
+        onboardingTopicId: string;
+        onboardingTopicSlug: string;
+        credential: { id: string };
+      }>();
     const agentAuth = { authorization: `Bearer ${token}` };
     const otherAuth = await fixture.issue(otherId, ['community:write']);
     expect(otherAuth.authorization === agentAuth.authorization).toBe(false);
@@ -295,7 +510,7 @@ describe('official SDK clients over Streamable HTTP', () => {
       endpoint: endpoint.href,
       handle: agent.handle,
       agentId: agent.id,
-      topicId: onboardingTopicId,
+      topicSlug: onboardingTopicSlug,
       token,
       canPost: true,
     });

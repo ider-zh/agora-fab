@@ -5,6 +5,7 @@ import {
   localHumanCredentials,
   principals,
   sessions,
+  topics,
   type Database,
 } from '@agorafab/db';
 import {
@@ -180,7 +181,7 @@ export function createIdentityService(
   async function inviteAgent(
     auth: AuthContext | null,
     key: string,
-    input: {
+    input?: {
       handle: string;
       displayName: string;
       ownerPrincipalId: string;
@@ -189,50 +190,70 @@ export function createIdentityService(
     },
   ) {
     const actor = authorize(auth, 'admin');
-    return idempotent(
-      database,
-      actor.id,
-      'agent.invite',
-      key,
-      input,
-      async (tx) => {
-        const [owner] = await tx
-          .select({ id: principals.id })
-          .from(principals)
-          .where(
-            and(
-              eq(principals.id, input.ownerPrincipalId),
-              eq(principals.kind, 'human'),
-              eq(principals.status, 'active'),
-            ),
-          )
-          .for('share');
-        if (!owner)
-          throw new DomainError(
-            422,
-            'INVALID_OWNER',
-            'The owner must be an active human principal.',
-          );
-        const [row] = await tx
+    return idempotent<{
+      principal: Principal;
+      credential?: Awaited<ReturnType<typeof createCredential>>['credential'];
+    }>(database, actor.id, 'agent.invite', key, input ?? {}, async (tx) => {
+      const ownerPrincipalId = input?.ownerPrincipalId ?? actor.id;
+      const [owner] = await tx
+        .select({ id: principals.id })
+        .from(principals)
+        .where(
+          and(
+            eq(principals.id, ownerPrincipalId),
+            eq(principals.kind, 'human'),
+            eq(principals.status, 'active'),
+          ),
+        )
+        .for('share');
+      if (!owner)
+        throw new DomainError(
+          422,
+          'INVALID_OWNER',
+          'The owner must be an active human principal.',
+        );
+      let row: typeof principals.$inferSelect | undefined;
+      // Manual handles report a conflict. Generated handles retry against the same unique index.
+      for (let attempt = 0; attempt < (input ? 1 : 5); attempt++) {
+        const suffix = input ? '' : randomBytes(5).toString('hex');
+        [row] = await tx
           .insert(principals)
-          .values({ ...input, kind: 'agent' })
+          .values({
+            ...(input ?? {
+              handle: `agent_${suffix}`,
+              displayName: `Agent ${suffix.toUpperCase()}`,
+              ownerPrincipalId,
+              platform: 'MCP',
+              capabilities: [],
+            }),
+            kind: 'agent',
+          })
           .onConflictDoNothing({ target: principals.handle })
           .returning();
-        if (!row)
-          throw new DomainError(
-            409,
-            'HANDLE_UNAVAILABLE',
-            'This handle is already in use.',
-          );
-        await tx.insert(auditEvents).values({
-          actorId: actor.id,
-          action: 'agent.invite',
-          targetType: 'principal',
-          targetId: row.id,
-        });
-        return { stored: { principal: serializePrincipal(row) } };
-      },
-    );
+        if (row) break;
+      }
+      if (!row)
+        throw new DomainError(
+          409,
+          'HANDLE_UNAVAILABLE',
+          'This handle is already in use.',
+        );
+      await tx.insert(auditEvents).values({
+        actorId: actor.id,
+        action: 'agent.invite',
+        targetType: 'principal',
+        targetId: row.id,
+      });
+      const principal = serializePrincipal(row);
+      if (input) return { stored: { principal } };
+
+      const { credential, transient } = await createCredential(tx, actor.id, {
+        agentId: row.id,
+        scopes: ['community:write'],
+        expiresInHours: 168,
+      });
+      return { stored: { principal, credential }, transient };
+    });
   }
 
   async function renameAgent(
@@ -319,46 +340,65 @@ export function createIdentityService(
             input.replacesCredentialId,
             true,
           );
-        const token = `agf_${randomBytes(32).toString('base64url')}`;
-        const expiresAt = new Date(
-          Date.now() + input.expiresInHours * 60 * 60 * 1000,
+        const { credential, transient } = await createCredential(
+          tx,
+          actor.id,
+          input,
         );
-        const scopes = input.scopes;
-        const [credential] = await tx
-          .insert(agentCredentials)
-          .values({
-            agentId: agent.id,
-            tokenHash: digest(token),
-            scopes,
-            expiresAt,
-            createdBy: actor.id,
-          })
-          .returning({ id: agentCredentials.id });
-        if (!credential) throw new Error('Credential insert failed.');
-        await tx.insert(auditEvents).values({
-          actorId: actor.id,
-          action: 'agent.token.issue',
-          targetType: 'agent_credential',
-          targetId: credential.id,
-          metadataJson: {
-            agentId: agent.id,
-            scopes,
-            replacesCredentialId: input.replacesCredentialId,
-          },
-        });
-        return {
-          stored: {
-            credential: {
-              id: credential.id,
-              agentId: agent.id,
-              scopes,
-              expiresAt: expiresAt.toISOString(),
-            },
-          },
-          transient: { token, onboardingTopicId: introductionsTopicId },
-        };
+        return { stored: { credential }, transient };
       },
     );
+  }
+
+  async function createCredential(
+    tx: Transaction,
+    actorId: string,
+    input: {
+      agentId: string;
+      scopes: AgentScope[];
+      expiresInHours: number;
+      replacesCredentialId?: string;
+    },
+  ) {
+    const { agentId, scopes, expiresInHours, replacesCredentialId } = input;
+    const token = `agf_${randomBytes(32).toString('base64url')}`;
+    const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
+    const [credential] = await tx
+      .insert(agentCredentials)
+      .values({
+        agentId,
+        tokenHash: digest(token),
+        scopes,
+        expiresAt,
+        createdBy: actorId,
+      })
+      .returning({ id: agentCredentials.id });
+    if (!credential) throw new Error('Credential insert failed.');
+    await tx.insert(auditEvents).values({
+      actorId,
+      action: 'agent.token.issue',
+      targetType: 'agent_credential',
+      targetId: credential.id,
+      metadataJson: { agentId, scopes, replacesCredentialId },
+    });
+    // The migration can pick a suffixed slug if another Topic already uses the default.
+    const [topic] = await tx
+      .select({ slug: topics.slug })
+      .from(topics)
+      .where(eq(topics.id, introductionsTopicId));
+    return {
+      credential: {
+        id: credential.id,
+        agentId,
+        scopes,
+        expiresAt: expiresAt.toISOString(),
+      },
+      transient: {
+        token,
+        onboardingTopicId: introductionsTopicId,
+        onboardingTopicSlug: topic?.slug,
+      },
+    };
   }
 
   async function revokeCredential(

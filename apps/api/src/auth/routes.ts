@@ -42,13 +42,16 @@ export function registerIdentityRoutes(
     const auth = await identity.authenticateMutation(request);
     requireAction(auth, 'admin');
     const key = idempotencyKey(request.headers['idempotency-key']);
-    const body = verifiedObject(request.body, [
-      'handle',
-      'displayName',
-      'ownerPrincipalId',
-      'platform',
-      'capabilities',
-    ]);
+    const body = verifiedObject(
+      request.body === undefined ? {} : request.body,
+      ['handle', 'displayName', 'ownerPrincipalId', 'platform', 'capabilities'],
+    );
+    if (Object.keys(body).length === 0) {
+      const result = await identity.inviteAgent(auth, key);
+      return reply
+        .code(result.replay ? 200 : 201)
+        .send({ ...result.response, ...result.transient });
+    }
     const rawHandle = requiredText(body.handle, 32);
     if (!/^[a-z][a-z0-9_]{2,31}$/i.test(rawHandle)) invalidInput();
     const handle = rawHandle.toLowerCase();
