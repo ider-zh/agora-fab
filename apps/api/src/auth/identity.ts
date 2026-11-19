@@ -5,6 +5,7 @@ import {
   localHumanCredentials,
   principals,
   sessions,
+  topics,
   type Database,
 } from '@agorafab/db';
 import {
@@ -25,8 +26,8 @@ import {
   slicePage,
   type ListPageOptions,
 } from '../community/cursor.js';
-import { idempotent } from '../idempotency.js';
 import { uuidPattern } from '../http-validation.js';
+import { idempotent, type Transaction } from '../idempotency.js';
 import type { AuthorizeMutation } from '../traffic.js';
 import {
   agentTokenPattern,
@@ -36,6 +37,9 @@ import {
   sessionCookieName,
   sessionTokenPattern,
 } from './http.js';
+
+// Seed-independent Topic provisioned by the Agent introductions migration.
+const introductionsTopicId = 'ea194164-1600-494b-a338-1dc6ffbad67c';
 
 export function serializePrincipal(
   row: typeof principals.$inferSelect,
@@ -181,7 +185,7 @@ export function createIdentityService(
   async function inviteAgent(
     auth: AuthContext | null,
     key: string,
-    input: {
+    input?: {
       handle: string;
       displayName: string;
       ownerPrincipalId?: string;
@@ -191,53 +195,108 @@ export function createIdentityService(
     },
   ) {
     const actor = authorize(auth, 'admin');
-    return idempotent(
-      database,
-      actor.id,
-      'agent.invite',
-      key,
-      input,
-      async (tx) => {
-        const [owner] = await tx
-          .select({ id: principals.id })
-          .from(principals)
-          .where(
-            and(
-              input.ownerPrincipalId
-                ? eq(principals.id, input.ownerPrincipalId)
-                : eq(principals.handle, input.ownerHandle ?? ''),
-              eq(principals.kind, 'human'),
-              eq(principals.status, 'active'),
-            ),
-          )
-          .for('share');
-        if (!owner)
-          throw new DomainError(
-            422,
-            'INVALID_OWNER',
-            'The owner must be an active human principal.',
-          );
-        const [row] = await tx
+    return idempotent<{
+      principal: Principal;
+      credential?: Awaited<ReturnType<typeof createCredential>>['credential'];
+    }>(database, actor.id, 'agent.invite', key, input ?? {}, async (tx) => {
+      const ownerPrincipalId = input?.ownerPrincipalId ?? actor.id;
+      const [owner] = await tx
+        .select({ id: principals.id })
+        .from(principals)
+        .where(
+          and(
+            input?.ownerHandle
+              ? eq(principals.handle, input.ownerHandle)
+              : eq(principals.id, ownerPrincipalId),
+            eq(principals.kind, 'human'),
+            eq(principals.status, 'active'),
+          ),
+        )
+        .for('share');
+      if (!owner)
+        throw new DomainError(
+          422,
+          'INVALID_OWNER',
+          'The owner must be an active human principal.',
+        );
+      let row: typeof principals.$inferSelect | undefined;
+      // Manual handles report a conflict. Generated handles retry against the same unique index.
+      for (let attempt = 0; attempt < (input ? 1 : 5); attempt++) {
+        const suffix = input ? '' : randomBytes(5).toString('hex');
+        [row] = await tx
           .insert(principals)
           .values({
-            handle: input.handle,
-            displayName: input.displayName,
+            ...(input ?? {
+              handle: `agent_${suffix}`,
+              displayName: `Agent ${suffix.toUpperCase()}`,
+              ownerPrincipalId,
+              platform: 'MCP',
+              capabilities: [],
+            }),
             ownerPrincipalId: owner.id,
-            platform: input.platform,
-            capabilities: input.capabilities,
             kind: 'agent',
           })
           .onConflictDoNothing({ target: principals.handle })
           .returning();
+        if (row) break;
+      }
+      if (!row)
+        throw new DomainError(
+          409,
+          'HANDLE_UNAVAILABLE',
+          'This handle is already in use.',
+        );
+      await tx.insert(auditEvents).values({
+        actorId: actor.id,
+        action: 'agent.invite',
+        targetType: 'principal',
+        targetId: row.id,
+      });
+      const principal = serializePrincipal(row);
+      if (input) return { stored: { principal } };
+
+      const { credential, transient } = await createCredential(tx, actor.id, {
+        agentId: row.id,
+        scopes: ['community:write'],
+        expiresInHours: 168,
+      });
+      return { stored: { principal, credential }, transient };
+    });
+  }
+
+  async function renameAgent(
+    auth: AuthContext | null,
+    key: string,
+    input: { agentId: string; displayName: string },
+  ) {
+    const actor = authorize(auth, 'admin');
+    return idempotent(
+      database,
+      actor.id,
+      'agent.rename',
+      key,
+      input,
+      async (tx) => {
+        const [row] = await tx
+          .update(principals)
+          .set({ displayName: input.displayName, updatedAt: new Date() })
+          .where(
+            and(
+              eq(principals.id, input.agentId),
+              eq(principals.kind, 'agent'),
+              eq(principals.status, 'active'),
+            ),
+          )
+          .returning();
         if (!row)
           throw new DomainError(
-            409,
-            'HANDLE_UNAVAILABLE',
-            'This handle is already in use.',
+            404,
+            'AGENT_NOT_FOUND',
+            'Active agent not found.',
           );
         await tx.insert(auditEvents).values({
           actorId: actor.id,
-          action: 'agent.invite',
+          action: 'agent.rename',
           targetType: 'principal',
           targetId: row.id,
         });
@@ -249,7 +308,12 @@ export function createIdentityService(
   async function issueToken(
     auth: AuthContext | null,
     key: string,
-    input: { agentId: string; scopes: AgentScope[]; expiresInHours: number },
+    input: {
+      agentId: string;
+      scopes: AgentScope[];
+      expiresInHours: number;
+      replacesCredentialId?: string;
+    },
   ) {
     const actor = authorize(auth, 'admin');
     return idempotent(
@@ -276,42 +340,117 @@ export function createIdentityService(
             'AGENT_NOT_FOUND',
             'Active agent not found.',
           );
-        const token = `agf_${randomBytes(32).toString('base64url')}`;
-        const expiresAt = new Date(
-          Date.now() + input.expiresInHours * 60 * 60 * 1000,
+        if (input.replacesCredentialId)
+          await revokeCredential(
+            tx,
+            actor.id,
+            agent.id,
+            input.replacesCredentialId,
+            true,
+          );
+        const { credential, transient } = await createCredential(
+          tx,
+          actor.id,
+          input,
         );
-        const scopes = input.scopes;
-        const [credential] = await tx
-          .insert(agentCredentials)
-          .values({
-            agentId: agent.id,
-            tokenHash: digest(token),
-            scopes,
-            expiresAt,
-            createdBy: actor.id,
-          })
-          .returning({ id: agentCredentials.id });
-        if (!credential) throw new Error('Credential insert failed.');
-        await tx.insert(auditEvents).values({
-          actorId: actor.id,
-          action: 'agent.token.issue',
-          targetType: 'agent_credential',
-          targetId: credential.id,
-          metadataJson: { agentId: agent.id, scopes },
-        });
-        return {
-          stored: {
-            credential: {
-              id: credential.id,
-              agentId: agent.id,
-              scopes,
-              expiresAt: expiresAt.toISOString(),
-            },
-          },
-          transient: { token },
-        };
+        return { stored: { credential }, transient };
       },
     );
+  }
+
+  async function createCredential(
+    tx: Transaction,
+    actorId: string,
+    input: {
+      agentId: string;
+      scopes: AgentScope[];
+      expiresInHours: number;
+      replacesCredentialId?: string;
+    },
+  ) {
+    const { agentId, scopes, expiresInHours, replacesCredentialId } = input;
+    const token = `agf_${randomBytes(32).toString('base64url')}`;
+    const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000);
+    const [credential] = await tx
+      .insert(agentCredentials)
+      .values({
+        agentId,
+        tokenHash: digest(token),
+        scopes,
+        expiresAt,
+        createdBy: actorId,
+      })
+      .returning({ id: agentCredentials.id });
+    if (!credential) throw new Error('Credential insert failed.');
+    await tx.insert(auditEvents).values({
+      actorId,
+      action: 'agent.token.issue',
+      targetType: 'agent_credential',
+      targetId: credential.id,
+      metadataJson: { agentId, scopes, replacesCredentialId },
+    });
+    // The migration can pick a suffixed slug if another Topic already uses the default.
+    const [topic] = await tx
+      .select({ slug: topics.slug })
+      .from(topics)
+      .where(eq(topics.id, introductionsTopicId));
+    return {
+      credential: {
+        id: credential.id,
+        agentId,
+        scopes,
+        expiresAt: expiresAt.toISOString(),
+      },
+      transient: {
+        token,
+        onboardingTopicId: introductionsTopicId,
+        onboardingTopicSlug: topic?.slug,
+      },
+    };
+  }
+
+  async function revokeCredential(
+    tx: Transaction,
+    actorId: string,
+    agentId: string,
+    credentialId: string,
+    replacing = false,
+  ) {
+    const where = and(
+      eq(agentCredentials.id, credentialId),
+      eq(agentCredentials.agentId, agentId),
+    );
+    const [changed] = await tx
+      .update(agentCredentials)
+      .set({ revokedAt: new Date() })
+      .where(and(where, isNull(agentCredentials.revokedAt)))
+      .returning({ id: agentCredentials.id });
+    if (changed) {
+      await tx.insert(auditEvents).values({
+        actorId,
+        action: 'agent.token.revoke',
+        targetType: 'agent_credential',
+        targetId: credentialId,
+        metadataJson: { agentId },
+      });
+    } else {
+      const [existing] = await tx
+        .select({ id: agentCredentials.id })
+        .from(agentCredentials)
+        .where(where);
+      if (!existing)
+        throw new DomainError(
+          404,
+          'CREDENTIAL_NOT_FOUND',
+          'Credential not found.',
+        );
+      if (replacing)
+        throw new DomainError(
+          409,
+          'CREDENTIAL_ALREADY_REVOKED',
+          'This credential was already revoked or replaced.',
+        );
+    }
   }
 
   async function revokeToken(
@@ -320,37 +459,9 @@ export function createIdentityService(
     credentialId: string,
   ) {
     const actor = authorize(auth, 'admin');
-    await database.db.transaction(async (tx) => {
-      const where = and(
-        eq(agentCredentials.id, credentialId),
-        eq(agentCredentials.agentId, agentId),
-      );
-      const [changed] = await tx
-        .update(agentCredentials)
-        .set({ revokedAt: new Date() })
-        .where(and(where, isNull(agentCredentials.revokedAt)))
-        .returning({ id: agentCredentials.id });
-      if (changed) {
-        await tx.insert(auditEvents).values({
-          actorId: actor.id,
-          action: 'agent.token.revoke',
-          targetType: 'agent_credential',
-          targetId: credentialId,
-          metadataJson: { agentId },
-        });
-      } else {
-        const [existing] = await tx
-          .select({ id: agentCredentials.id })
-          .from(agentCredentials)
-          .where(where);
-        if (!existing)
-          throw new DomainError(
-            404,
-            'CREDENTIAL_NOT_FOUND',
-            'Credential not found.',
-          );
-      }
-    });
+    await database.db.transaction((tx) =>
+      revokeCredential(tx, actor.id, agentId, credentialId),
+    );
   }
 
   async function revokeAgent(auth: AuthContext | null, agentId: string) {
@@ -464,6 +575,7 @@ export function createIdentityService(
     authenticateMutation,
     logout,
     inviteAgent,
+    renameAgent,
     issueToken,
     revokeToken,
     revokeAgent,

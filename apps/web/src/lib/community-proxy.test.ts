@@ -69,6 +69,7 @@ describe('community browser mutation boundary', () => {
     for (const [method, route] of [
       ['POST', ['admin', 'agents']],
       ['POST', ['admin', 'agents', id, 'credentials']],
+      ['PATCH', ['admin', 'agents', id]],
       ['DELETE', ['admin', 'agents', id]],
       ['DELETE', ['admin', 'agents', id, 'credentials', id]],
     ] as const) {
@@ -78,7 +79,7 @@ describe('community browser mutation boundary', () => {
       expect(response.status).toBe(201);
       expect(response.headers.get('cache-control')).toBe('no-store');
     }
-    expect(fakeFetch).toHaveBeenCalledTimes(4);
+    expect(fakeFetch).toHaveBeenCalledTimes(5);
     for (const [, options] of fakeFetch.mock.calls) {
       expect(options.headers.has('authorization')).toBe(false);
       expect(options.headers.get('cookie')).toBe(

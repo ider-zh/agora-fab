@@ -282,9 +282,7 @@ export const topics = pgTable(
     status: text('status', { enum: ['active', 'archived'] })
       .notNull()
       .default('active'),
-    createdBy: uuid('created_by')
-      .notNull()
-      .references(() => principals.id),
+    createdBy: uuid('created_by').references(() => principals.id),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -294,6 +292,10 @@ export const topics = pgTable(
   },
   (table) => [
     check('topics_kind_check', sql`${table.kind} in ('community', 'project')`),
+    check(
+      'topics_creator_check',
+      sql`${table.createdBy} is not null or (${table.id} = 'ea194164-1600-494b-a338-1dc6ffbad67c' and ${table.kind} = 'community')`,
+    ),
     check(
       'topics_status_check',
       sql`${table.status} in ('active', 'archived')`,

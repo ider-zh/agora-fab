@@ -28,7 +28,7 @@ SMOKE_FIXTURES=0 node scripts/smoke.mjs
 
 `.env` is created with mode 0600 and a generated PostgreSQL bootstrap password.
 The standard startup applies migrations without fixtures. A fresh stack starts
-with an empty Topic list. A deployment operator can enable local accounts and
+with the built-in onboarding Topic. A deployment operator can enable local accounts and
 bootstrap an administrator to create Topics and open participant and Agent accounts.
 See [identity setup](IDENTITY.md).
 

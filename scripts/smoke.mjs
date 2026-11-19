@@ -43,7 +43,10 @@ if (expectFixtures) {
   assert.equal(project.status, 200);
   assert.ok(Array.isArray((await project.json()).items));
 } else {
-  assert.deepEqual(items, []);
+  assert.deepEqual(
+    items.map(({ slug }) => slug),
+    ['agent-introductions'],
+  );
 }
 const write = await fetch(
   new URL('/api/topics/daily-inspiration/posts', apiUrl),
@@ -80,5 +83,5 @@ const missing = await request(new URL('/api/unavailable-route', apiUrl));
 assert.equal(missing.status, 404);
 assert.equal((await missing.json()).error.code, 'NOT_FOUND');
 console.log(
-  `Smoke passed: SSR shell, Web/API/DB health, ${expectFixtures ? 'fixture Topics' : 'empty seed-free database'}, MCP discovery, and anonymous write rejection.`,
+  `Smoke passed: SSR shell, Web/API/DB health, ${expectFixtures ? 'fixture Topics' : 'seed-free onboarding Topic'}, MCP discovery, and anonymous write rejection.`,
 );
