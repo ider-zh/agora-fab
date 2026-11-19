@@ -94,7 +94,14 @@ export default async function AccountPage({
   return (
     <main>
       <SiteHeader page="account" />
-      <section className="account" aria-labelledby="account-title">
+      <section
+        className={
+          account.status === 'signed-in'
+            ? 'account account-dashboard'
+            : 'account'
+        }
+        aria-labelledby="account-title"
+      >
         <h1 id="account-title">账户</h1>
         {message && (
           <p className="account-error" role="alert">
@@ -102,39 +109,74 @@ export default async function AccountPage({
           </p>
         )}
         {account.status === 'signed-in' && (
-          <div className="account-card">
-            <h2>{account.profile.displayName}</h2>
-            <dl className="account-profile">
-              <div>
-                <dt>用户名</dt>
-                <dd>@{account.profile.handle}</dd>
-              </div>
-              <div>
-                <dt>角色</dt>
-                <dd>
-                  {account.profile.role === 'admin' ? '管理员' : '参与者'}
-                </dd>
-              </div>
-              <div>
-                <dt>身份 ID</dt>
-                <dd>
-                  <code>{account.profile.id}</code>
-                </dd>
-              </div>
-            </dl>
-            {account.profile.role === 'admin' && (
-              <Link className="community-button clear" href="/admin">
-                管理社区
-              </Link>
-            )}
-            <form action="/api/auth/logout" method="post">
-              <button
-                type="submit"
-                className="account-button account-button-secondary"
+          <div className="account-dashboard-grid">
+            <section
+              className="account-card"
+              aria-labelledby="account-profile-title"
+            >
+              <h2 id="account-profile-title">{account.profile.displayName}</h2>
+              <dl className="account-profile">
+                <div>
+                  <dt>用户名</dt>
+                  <dd>@{account.profile.handle}</dd>
+                </div>
+                <div>
+                  <dt>角色</dt>
+                  <dd>
+                    {account.profile.role === 'admin' ? '管理员' : '参与者'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>身份 ID</dt>
+                  <dd>
+                    <code>{account.profile.id}</code>
+                  </dd>
+                </div>
+              </dl>
+              <form action="/api/auth/logout" method="post">
+                <button
+                  type="submit"
+                  className="account-button account-button-secondary"
+                >
+                  退出登录
+                </button>
+              </form>
+            </section>
+            <div className="account-dashboard-tools">
+              <nav
+                className="account-card"
+                aria-labelledby="account-workspace-title"
               >
-                退出登录
-              </button>
-            </form>
+                <h2 id="account-workspace-title">工作区</h2>
+                <ul className="account-dashboard-links">
+                  <li>
+                    <Link href="/topics">Topic 与项目</Link>
+                  </li>
+                  <li>
+                    <Link href="/notifications">通知</Link>
+                  </li>
+                  <li>
+                    <Link href="/search">搜索讨论</Link>
+                  </li>
+                </ul>
+              </nav>
+              {account.profile.role === 'admin' && (
+                <nav
+                  className="account-card"
+                  aria-labelledby="account-admin-title"
+                >
+                  <h2 id="account-admin-title">管理员工具</h2>
+                  <ul className="account-dashboard-links">
+                    <li>
+                      <Link href="/admin">管理社区</Link>
+                    </li>
+                    <li>
+                      <Link href="/admin/agents">管理 Agent</Link>
+                    </li>
+                  </ul>
+                </nav>
+              )}
+            </div>
           </div>
         )}
         {account.status === 'signed-out' && (
