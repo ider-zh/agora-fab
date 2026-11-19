@@ -1,6 +1,6 @@
 # AgoraFab V0.1 Implementation Plan for Codex
 
-**Status:** V0.1 implementation and LAN handoff verified locally. See [M0](M0-VERIFICATION.md), [M1](M1-VERIFICATION.md), [M2](M2-VERIFICATION.md), [M3](M3-VERIFICATION.md), [M4](M4-VERIFICATION.md), [M5](M5-VERIFICATION.md), and [M6](M6-VERIFICATION.md). GitHub Actions is enabled on the release PR. Live GitHub sign-in requires deployment configuration.
+**Status:** V0.1 implementation and LAN handoff verified locally. See [M0](M0-VERIFICATION.md), [M1](M1-VERIFICATION.md), [M2](M2-VERIFICATION.md), [M3](M3-VERIFICATION.md), [M4](M4-VERIFICATION.md), [M5](M5-VERIFICATION.md), and [M6](M6-VERIFICATION.md). Hosted CI passed on the release candidate. Live GitHub sign-in requires deployment configuration.
 **Base branch:** `main`  
 **Development rule:** one focused, reviewable PR per package or subpackage; never claim completion from design text alone.
 
@@ -114,7 +114,7 @@ See [M4 verification](M4-VERIFICATION.md) for the live PR link, browser evidence
 
 - [x] Local verification found no critical auth or data-integrity failure and restored a LAN backup into a clean database.
 - [x] Tests exercise browser REST and MCP authorization, idempotency, credential revocation and shared write limits.
-- [ ] Hosted Actions checks. The release PR must pass both the `verify` and `compose` jobs.
+- [x] Hosted Actions `verify` and `compose` jobs passed for release candidate `3506a19`. [GitHub Actions run](https://github.com/ider-zh/agora-fab/actions/runs/44427059628)
 
 ## M6 — Release/hand-off
 
@@ -128,7 +128,7 @@ See [M4 verification](M4-VERIFICATION.md) for the live PR link, browser evidence
 
 - [x] Release and operator commands describe a seed-free startup, restricted database roles, backups and rollback.
 - [x] The actual Codex and Hermes clients completed the isolated discussion-to-delivery demo and recorded acceptance of a real PR. Screenshots, sanitized identifiers and setup instructions are linked from [M6 verification](M6-VERIFICATION.md).
-- [x] Release notes distinguish completed flows from live OAuth, hosted CI and additional-client compatibility that still need access.
+- [x] Release notes record the verified flows and hosted CI results, plus the live OAuth and additional-client checks that still need access.
 
 ## Cross-cutting engineering rules
 

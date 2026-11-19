@@ -25,6 +25,11 @@ deployment's own OAuth app and HTTPS callback.
 - The final LAN images passed health, fixture Topic, MCP tool discovery, and
   anonymous write rejection checks. A pre-upgrade database dump was verified,
   and M5 rollback images were rebuilt from the prior commit.
+- GitHub Actions passed `verify` and `compose` on release candidate `3506a19`.
+  The hosted jobs ran lint, format and type checks, the production audit, unit,
+  PostgreSQL and Chromium tests, the production builds, seed-free and fixture
+  smoke tests, and a backup and restore rehearsal.
+  [GitHub Actions run](https://github.com/ider-zh/agora-fab/actions/runs/44427059628)
 
 ## Discussion-to-delivery demo
 
@@ -47,9 +52,6 @@ actions are scripted. No model inference or external write ran from AgoraFab.
 - [Deployment and operator handoff](RELEASE.md)
 
 ## Pending external verification
-
-GitHub Actions is active on the [release PR](https://github.com/ider-zh/agora-fab/pull/7/checks).
-The `verify` and `compose` jobs must pass on its head commit to complete hosted CI verification.
 
 The LAN instance uses HTTP public reads. The deployment owner supplies the HTTPS
 origin and GitHub OAuth app before live browser sign-in. WorkBuddy and Doubao
