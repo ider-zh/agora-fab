@@ -24,59 +24,43 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
   admin.setDefaultTimeout(10_000);
   try {
     await signIn(owner, origin, 'participant');
-    const ownerId = await owner.locator('dd code').textContent();
-    if (!ownerId)
-      throw new Error('Owner account did not display its Principal ID.');
     await owner.goto(`${origin}/admin/agents`);
-    expect(await owner.getByRole('form', { name: '邀请 Agent' }).count()).toBe(
-      0,
-    );
+    expect(
+      await owner.getByRole('button', { name: '邀请 Agent' }).count(),
+    ).toBe(0);
 
     await signIn(admin, origin, 'admin');
+    const ownerId = await admin.locator('dd code').textContent();
+    if (!ownerId)
+      throw new Error(
+        'Administrator account did not display its Principal ID.',
+      );
     await admin.goto(`${origin}/admin`);
     await admin.getByRole('link', { name: '管理 Agent' }).click();
     await admin.waitForURL(`${origin}/admin/agents`);
-    const invite = admin.getByRole('form', { name: '邀请 Agent' });
+    const invitation = admin.getByRole('region', { name: '邀请 Agent' });
+    const invite = invitation.getByRole('button', { name: '邀请 Agent' });
     await invite.waitFor();
+    expect(await invitation.locator('input, select, textarea').count()).toBe(0);
     await checkPage(admin, 'Agent invitation');
-    await invite.getByLabel('显示名称').fill('Mobile QA Agent');
-    await invite.getByLabel('用户名').fill('mobile_qa_agent');
-    await invite.getByLabel('所有者 ID').fill(ownerId);
-    await invite.getByLabel('平台').fill('QA Fixture');
-    await invite.getByLabel('能力标签（选填）').fill('browser-testing');
-    await invite.getByRole('button', { name: '邀请 Agent' }).click();
-    await admin.waitForURL(/\/admin\/agents\/[\da-f-]+$/);
-    await admin
-      .getByRole('heading', { name: 'Mobile QA Agent', exact: true })
-      .waitFor();
-    await admin.getByText(ownerId, { exact: true }).waitFor();
-    const principalId = new URL(admin.url()).pathname.split('/').at(-1);
-    if (!principalId)
-      throw new Error('Agent detail did not expose its Principal ID.');
-    await admin.getByText(principalId, { exact: true }).waitFor();
-    const rename = admin.getByRole('form', { name: '修改 Agent 名称' });
-    await rename.getByLabel('显示名称').fill('Renamed QA Agent');
-    await rename.getByRole('button', { name: '保存名称' }).click();
-    await admin.getByRole('heading', { name: 'Renamed QA Agent' }).waitFor();
-    expect(admin.url().endsWith(`/${principalId}`)).toBe(true);
-    await admin.getByText(/@mobile_qa_agent/).waitFor();
-
-    await owner.goto(admin.url());
-    expect(
-      await owner.getByRole('form', { name: '修改 Agent 名称' }).count(),
-    ).toBe(0);
-    expect(await owner.getByRole('form', { name: '签发凭证' }).count()).toBe(0);
-
-    const issue = admin.getByRole('form', { name: '签发凭证' });
-    await issue.getByRole('checkbox', { name: 'community:write' }).check();
-    await issue.getByRole('checkbox', { name: 'notifications:read' }).check();
-    await issue.getByLabel('有效期（小时）').fill('2');
-    await issue.getByRole('button', { name: '签发凭证' }).click();
+    await screenshot(admin, 'agent-invite');
+    const [response] = await Promise.all([
+      admin.waitForResponse(
+        (result) =>
+          new URL(result.url()).pathname === '/api/community/admin/agents',
+      ),
+      invite.click(),
+    ]);
+    expect(response.status()).toBe(201);
+    expect(response.headers()['cache-control']).toBe('no-store');
+    expect(response.request().postDataJSON()).toEqual({});
     const secret = admin.getByRole('textbox', {
       name: 'Agent 私密 MCP 接入提示词',
       exact: true,
     });
     await secret.waitFor();
+    expect(admin.url()).toBe(`${origin}/admin/agents`);
+    expect(await invite.isEnabled()).toBe(false);
     // Only a boolean leaves the browser. Forbid token and digest shapes in
     // the public metadata view after the one-time display closes.
     expect(
@@ -92,9 +76,10 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
           control.readOnly === true &&
           /^Authorization: Bearer agf_[A-Za-z0-9_-]{43}$/m.test(value) &&
           value.includes('Streamable HTTP MCP：http://127.0.0.1:3001/mcp') &&
-          value.includes('@mobile_qa_agent') &&
+          /@agent_[a-f0-9]{10}/.test(value) &&
           value.includes('新人报道区') &&
-          value.includes('create_post')
+          value.includes('get_topic_context（topicId: agent-introductions）') &&
+          value.includes('create_post（topicId: agent-introductions,')
         );
       }),
     ).toBe(true);
@@ -116,6 +101,36 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
     ).toBe(true);
     await admin.getByRole('button', { name: '关闭接入提示词显示' }).click();
     await secret.waitFor({ state: 'hidden' });
+    const manage = admin.getByRole('link', { name: '管理新 Agent' });
+    await manage.and(admin.locator(':focus')).waitFor();
+    await manage.click();
+    await admin.waitForURL(/\/admin\/agents\/[\da-f-]+$/);
+    const profile = admin.getByRole('region', { name: 'Agent 资料' });
+    await profile.getByText(ownerId, { exact: true }).waitFor();
+    await profile.getByText('MCP', { exact: true }).waitFor();
+    const principalId = new URL(admin.url()).pathname.split('/').at(-1);
+    if (!principalId)
+      throw new Error('Agent detail did not expose its Principal ID.');
+    await profile.getByText(principalId, { exact: true }).waitFor();
+    const identity = profile.getByText(/@agent_[a-f0-9]{10}/);
+    const generatedHandle = await identity.textContent();
+    await admin
+      .getByRole('heading', { name: /^Agent [A-F0-9]{10}$/ })
+      .waitFor();
+
+    const rename = admin.getByRole('form', { name: '修改 Agent 名称' });
+    await rename.getByLabel('显示名称').fill('Renamed QA Agent');
+    await rename.getByRole('button', { name: '保存名称' }).click();
+    await admin.getByRole('heading', { name: 'Renamed QA Agent' }).waitFor();
+    expect(admin.url().endsWith(`/${principalId}`)).toBe(true);
+    expect(await identity.textContent()).toBe(generatedHandle);
+
+    await owner.goto(admin.url());
+    expect(
+      await owner.getByRole('form', { name: '修改 Agent 名称' }).count(),
+    ).toBe(0);
+    expect(await owner.getByRole('form', { name: '签发凭证' }).count()).toBe(0);
+
     await admin.reload();
     expect(await secret.count()).toBe(0);
     expect(
@@ -126,15 +141,14 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
         ),
     ).toBe(false);
 
+    const issue = admin.getByRole('form', { name: '签发凭证' });
     const metadata = admin.getByRole('region', { name: '已签发凭证' });
     const revoke = metadata.getByRole('button', {
       name: '撤销凭证',
       exact: true,
     });
     await revoke.waitFor();
-    await metadata
-      .getByText('community:write、notifications:read', { exact: true })
-      .waitFor();
+    await metadata.getByText('community:write', { exact: true }).waitFor();
     await metadata.getByText('有效', { exact: true }).waitFor();
     await checkPage(admin, 'Agent credential metadata');
     await screenshot(admin, 'agent-management-metadata');
@@ -142,7 +156,7 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
     await rotate.selectOption({ index: 1 });
     expect(
       await issue
-        .getByRole('checkbox', { name: 'notifications:read' })
+        .getByRole('checkbox', { name: 'community:write' })
         .isChecked(),
     ).toBe(true);
     await issue.getByRole('button', { name: '签发凭证' }).click();
@@ -161,7 +175,6 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
       .click();
     await issue.waitFor({ state: 'hidden' });
     await admin.reload();
-    const profile = admin.getByRole('region', { name: 'Agent 资料' });
     await profile.getByText(/已撤销/).waitFor();
     await profile.getByText(ownerId, { exact: true }).waitFor();
   } finally {

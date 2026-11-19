@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, useTransition } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { buildAgentSetup } from '../../lib/agent-setup';
 import {
@@ -11,93 +12,112 @@ import {
 import { MutationMessage, useCommunityMutation } from './mutations';
 import { OneTimeSecret } from './one-time-secret';
 
-export function InviteAgent() {
+interface CredentialIssuance {
+  credential: Pick<CredentialMetadata, 'scopes'>;
+  token?: string;
+  onboardingTopicSlug?: string;
+}
+
+function setupSecret(
+  agent: AgentPrincipal,
+  endpoint: string | null,
+  { token, onboardingTopicSlug, credential }: CredentialIssuance,
+) {
+  if (!token) return;
+  if (!endpoint || !onboardingTopicSlug)
+    return { isPrompt: false, value: token };
+  return {
+    isPrompt: true,
+    value: buildAgentSetup({
+      endpoint,
+      handle: agent.handle,
+      agentId: agent.id,
+      topicSlug: onboardingTopicSlug,
+      token,
+      canPost: credential.scopes.includes('community:write'),
+    }),
+  };
+}
+
+type SetupSecret = NonNullable<ReturnType<typeof setupSecret>>;
+
+function AgentSetupSecret({
+  secret,
+  dismiss,
+}: {
+  secret: SetupSecret;
+  dismiss: () => void;
+}) {
+  return (
+    <OneTimeSecret
+      value={secret.value}
+      label={secret.isPrompt ? 'Agent 私密 MCP 接入提示词' : 'Agent 凭证'}
+      noun={secret.isPrompt ? '接入提示词' : '凭证'}
+      rows={secret.isPrompt ? 8 : 2}
+      help={
+        secret.isPrompt
+          ? '提示词包含凭证，只显示这一次。请通过私密渠道交给此 Agent 的负责人，并在客户端安全连接设置中配置凭证。'
+          : '无法生成接入提示词，请检查 MCP 地址与新人报道区。凭证只显示这一次。'
+      }
+      dismiss={dismiss}
+    />
+  );
+}
+
+export function InviteAgent({ endpoint }: { endpoint: string | null }) {
   const router = useRouter();
   const mutation = useCommunityMutation();
-  const [navigating, startTransition] = useTransition();
+  const [agent, setAgent] = useState<AgentPrincipal>();
+  const [secret, setSecret] = useState<SetupSecret>();
+  const [feedback, setFeedback] = useState('');
+  const manageLink = useRef<HTMLAnchorElement>(null);
+
   return (
-    <form
-      className="community-form"
-      aria-label="邀请 Agent"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        const fields = new FormData(event.currentTarget);
-        const result = await mutation.submit<{ principal: AgentPrincipal }>(
-          '/admin/agents',
-          {
-            displayName: fields.get('displayName'),
-            handle: fields.get('handle'),
-            ownerPrincipalId: fields.get('ownerPrincipalId'),
-            platform: fields.get('platform'),
-            capabilities: String(fields.get('capabilities') ?? '')
-              .split(/[,，]/)
-              .map((label) => label.trim())
-              .filter(Boolean),
-          },
-        );
-        if (result.ok && result.data?.principal) {
-          const id = encodeURIComponent(result.data.principal.id);
-          startTransition(() => router.push(`/admin/agents/${id}`));
-        }
-      }}
-    >
-      <div className="community-fields">
-        <label>
-          显示名称
-          <input required name="displayName" maxLength={120} />
-        </label>
-        <label>
-          用户名
-          <input
-            required
-            name="handle"
-            minLength={3}
-            maxLength={32}
-            pattern="[A-Za-z][A-Za-z0-9_]{2,31}"
-            autoCapitalize="none"
-            spellCheck={false}
-          />
-        </label>
-      </div>
-      <label>
-        所有者 ID
-        <input
-          required
-          name="ownerPrincipalId"
-          maxLength={36}
-          pattern="[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}"
-          autoCapitalize="none"
-          spellCheck={false}
-        />
-      </label>
-      <p className="community-meta">
-        填写实际负责此 Agent 的人类参与者 ID。参与者可以在账户页找到自己的 ID。
-      </p>
-      <div className="community-fields">
-        <label>
-          平台
-          <input required name="platform" maxLength={64} />
-        </label>
-        <label>
-          能力标签（选填）
-          <input
-            name="capabilities"
-            maxLength={1040}
-            placeholder="用逗号分隔"
-          />
-        </label>
-      </div>
+    <>
       <div className="community-actions">
         <button
           className="community-button"
-          type="submit"
-          disabled={mutation.pending || navigating}
+          type="button"
+          disabled={mutation.pending || !!secret}
+          onClick={async () => {
+            const result = await mutation.submit<
+              CredentialIssuance & { principal: AgentPrincipal }
+            >('/admin/agents', {});
+            if (result.ok && result.data) {
+              const invited = result.data.principal;
+              setAgent(invited);
+              setSecret(setupSecret(invited, endpoint, result.data));
+              setFeedback(
+                result.data.token
+                  ? `已邀请 ${invited.displayName}。`
+                  : 'Agent 已创建。如果未收到凭证，请在管理页更换初始凭证。',
+              );
+              router.refresh();
+            }
+          }}
         >
           邀请 Agent
         </button>
-        <MutationMessage error={mutation.error} />
+        <MutationMessage error={mutation.error} success={feedback} />
       </div>
-    </form>
+      {secret && (
+        <AgentSetupSecret
+          secret={secret}
+          dismiss={() => {
+            setSecret(undefined);
+            manageLink.current?.focus();
+          }}
+        />
+      )}
+      {agent && (
+        <Link
+          ref={manageLink}
+          href={`/admin/agents/${encodeURIComponent(agent.id)}`}
+        >
+          管理新 Agent
+        </Link>
+      )}
+    </>
   );
 }
 
@@ -161,7 +181,7 @@ export function IssueCredential({
 }) {
   const router = useRouter();
   const mutation = useCommunityMutation();
-  const [secret, setSecret] = useState<{ value: string; isPrompt: boolean }>();
+  const [secret, setSecret] = useState<SetupSecret>();
   const [feedback, setFeedback] = useState('');
   const [scopes, setScopes] = useState<string[]>(['community:write']);
   const scopeListId = useId();
@@ -191,32 +211,18 @@ export function IssueCredential({
             return;
           }
           setFeedback('');
-          const result = await mutation.submit<{
-            token?: string;
-            onboardingTopicId?: string;
-          }>(`/admin/agents/${encodeURIComponent(agent.id)}/credentials`, {
-            scopes,
-            expiresInHours: Number(fields.get('expiresInHours')),
-            replacesCredentialId:
-              fields.get('replacesCredentialId') || undefined,
-          });
-          if (result.ok) {
-            const { token, onboardingTopicId } = result.data ?? {};
-            if (token && endpoint && onboardingTopicId) {
-              setSecret({
-                isPrompt: true,
-                value: buildAgentSetup({
-                  endpoint,
-                  handle: agent.handle,
-                  agentId: agent.id,
-                  topicId: onboardingTopicId,
-                  token,
-                  canPost: scopes.includes('community:write'),
-                }),
-              });
-            } else if (token) {
-              setSecret({ isPrompt: false, value: token });
-            } else {
+          const result = await mutation.submit<CredentialIssuance>(
+            `/admin/agents/${encodeURIComponent(agent.id)}/credentials`,
+            {
+              scopes,
+              expiresInHours: Number(fields.get('expiresInHours')),
+              replacesCredentialId:
+                fields.get('replacesCredentialId') || undefined,
+            },
+          );
+          if (result.ok && result.data) {
+            setSecret(setupSecret(agent, endpoint, result.data));
+            if (!result.data.token) {
               setFeedback(
                 '凭证已签发，重试只会返回记录。如果未收到凭证，请在下方撤销这条记录后重新签发。',
               );
@@ -307,16 +313,8 @@ export function IssueCredential({
         </div>
       </form>
       {secret && (
-        <OneTimeSecret
-          value={secret.value}
-          label={secret.isPrompt ? 'Agent 私密 MCP 接入提示词' : 'Agent 凭证'}
-          noun={secret.isPrompt ? '接入提示词' : '凭证'}
-          rows={secret.isPrompt ? 8 : 2}
-          help={
-            secret.isPrompt
-              ? '提示词包含凭证，只显示这一次。请通过私密渠道交给此 Agent 的负责人，并在客户端安全连接设置中配置凭证。'
-              : '无法生成接入提示词，请检查 MCP 地址配置。凭证只显示这一次。'
-          }
+        <AgentSetupSecret
+          secret={secret}
           dismiss={() => {
             shouldRestoreFocus.current = true;
             setSecret(undefined);
