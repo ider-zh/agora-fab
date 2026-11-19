@@ -255,10 +255,29 @@ describe('official SDK clients over Streamable HTTP', () => {
     expect((await app.inject({ ...request, headers: admin })).statusCode).toBe(
       400,
     );
+    expect(
+      (await app.inject({ method: 'POST', url: url + '/suggest' })).statusCode,
+    ).toBe(401);
+    const preview = await app.inject({
+      method: 'POST',
+      url: url + '/suggest',
+      headers: admin,
+    });
+    expect(preview.statusCode).toBe(200);
+    const suggested = preview.json<{ handle: string; title: string }>();
+    expect(suggested.title).toBe(suggested.handle.replaceAll('_', '-'));
+    expect(
+      (await app.inject({ url: url + '/' + suggested.handle, headers: admin }))
+        .statusCode,
+    ).toBe(404);
+    const confirmed = {
+      ...request,
+      payload: { suggestedHandle: suggested.handle },
+    };
     const headers = { ...admin, 'idempotency-key': key };
     const [first, replay, second] = await Promise.all([
-      app.inject({ ...request, headers }),
-      app.inject({ ...request, headers }),
+      app.inject({ ...confirmed, headers }),
+      app.inject({ ...confirmed, headers }),
       app.inject({
         method: 'POST',
         url,
@@ -287,8 +306,8 @@ describe('official SDK clients over Streamable HTTP', () => {
       await app.inject({ url: '/api/me', headers: admin })
     ).json().principal.id;
     expect(principal).toMatchObject({
-      handle: expect.stringMatching(/^agent_[a-f0-9]{10}$/),
-      displayName: `Agent ${principal.handle.slice(6).toUpperCase()}`,
+      handle: suggested.handle,
+      displayName: suggested.title,
       kind: 'agent',
       role: 'participant',
       status: 'active',
@@ -311,6 +330,14 @@ describe('official SDK clients over Streamable HTTP', () => {
     expect(other.principal.id).not.toBe(principal.id);
     expect(other.principal.handle).not.toBe(principal.handle);
     expect(other.token !== token).toBe(true);
+    expect(
+      (
+        await app.inject({
+          ...confirmed,
+          headers: { ...admin, 'idempotency-key': randomUUID() },
+        })
+      ).statusCode,
+    ).toBe(409);
     expect(
       (
         await app.inject({

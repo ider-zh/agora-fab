@@ -14,6 +14,7 @@ import {
   verifiedObject,
 } from '../http-validation.js';
 import { sessionCookie } from './http.js';
+import { suggestedAgentHandle } from './agent-name.js';
 import type { IdentityService } from './identity.js';
 
 function labels(value: unknown): string[] {
@@ -51,10 +52,17 @@ export function registerIdentityRoutes(
         'ownerHandle',
         'platform',
         'capabilities',
+        'suggestedHandle',
       ],
     );
-    if (Object.keys(body).length === 0) {
-      const result = await identity.inviteAgent(auth, key);
+    if (Object.keys(body).length === 0 || body.suggestedHandle !== undefined) {
+      let handle: string | undefined;
+      if (body.suggestedHandle !== undefined) {
+        if (Object.keys(body).length !== 1) invalidInput();
+        handle = requiredText(body.suggestedHandle, 32);
+        if (!suggestedAgentHandle(handle)) invalidInput();
+      }
+      const result = await identity.inviteAgent(auth, key, undefined, handle);
       return reply
         .code(result.replay ? 200 : 201)
         .send({ ...result.response, ...result.transient });
@@ -87,6 +95,10 @@ export function registerIdentityRoutes(
     });
     return reply.code(result.replay ? 200 : 201).send(result.response);
   });
+
+  app.post('/api/admin/agents/suggest', async (request) =>
+    identity.suggestAgent(await identity.authenticateMutation(request)),
+  );
 
   app.get<{ Querystring: ListPageOptions }>(
     '/api/admin/agents',

@@ -66,39 +66,87 @@ function AgentSetupSecret({
 export function InviteAgent({ endpoint }: { endpoint: string | null }) {
   const router = useRouter();
   const mutation = useCommunityMutation();
+  const suggestion = useCommunityMutation();
+  const [proposal, setProposal] = useState<{ handle: string; title: string }>();
   const [agent, setAgent] = useState<AgentPrincipal>();
   const [secret, setSecret] = useState<SetupSecret>();
   const [feedback, setFeedback] = useState('');
   const manageLink = useRef<HTMLAnchorElement>(null);
+  const busy = mutation.pending || suggestion.pending;
+
+  async function previewName() {
+    setFeedback('');
+    const result = await suggestion.submit<{ handle: string; title: string }>(
+      '/admin/agents/suggest',
+      {},
+    );
+    if (result.ok && result.data) setProposal(result.data);
+  }
 
   return (
     <>
-      <div className="community-actions">
+      {!proposal && !secret && (
         <button
           className="community-button"
           type="button"
-          disabled={mutation.pending || !!secret}
-          onClick={async () => {
-            const result = await mutation.submit<
-              CredentialIssuance & { principal: AgentPrincipal }
-            >('/admin/agents', {});
-            if (result.ok && result.data) {
-              const invited = result.data.principal;
-              setAgent(invited);
-              setSecret(setupSecret(invited, endpoint, result.data));
-              setFeedback(
-                result.data.token
-                  ? `已邀请 ${invited.displayName}。`
-                  : 'Agent 已创建。如果未收到凭证，请在管理页更换初始凭证。',
-              );
-              router.refresh();
-            }
-          }}
+          disabled={busy}
+          onClick={previewName}
         >
           邀请 Agent
         </button>
-        <MutationMessage error={mutation.error} success={feedback} />
-      </div>
+      )}
+      {proposal && (
+        <div className="agent-name-preview">
+          <strong>{proposal.title}</strong>
+          <code>@{proposal.handle}</code>
+          <div className="community-actions">
+            <button
+              className="community-button"
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                const result = await mutation.submit<
+                  CredentialIssuance & { principal: AgentPrincipal }
+                >('/admin/agents', { suggestedHandle: proposal.handle });
+                if (result.ok && result.data) {
+                  const invited = result.data.principal;
+                  setProposal(undefined);
+                  setAgent(invited);
+                  setSecret(setupSecret(invited, endpoint, result.data));
+                  setFeedback(
+                    result.data.token
+                      ? `已邀请 ${invited.displayName}。`
+                      : 'Agent 已创建。如果未收到凭证，请在管理页更换初始凭证。',
+                  );
+                  router.refresh();
+                }
+              }}
+            >
+              确认创建
+            </button>
+            <button
+              className="community-button clear"
+              type="button"
+              disabled={busy}
+              onClick={previewName}
+            >
+              换一个名称
+            </button>
+            <button
+              className="community-button clear"
+              type="button"
+              disabled={busy}
+              onClick={() => setProposal(undefined)}
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
+      <MutationMessage
+        error={suggestion.error || (proposal ? mutation.error : '')}
+        success={feedback}
+      />
       {secret && (
         <AgentSetupSecret
           secret={secret}
@@ -111,7 +159,7 @@ export function InviteAgent({ endpoint }: { endpoint: string | null }) {
       {agent && (
         <Link
           ref={manageLink}
-          href={`/admin/agents/${encodeURIComponent(agent.handle)}`}
+          href={`/admin/agents?agent=${encodeURIComponent(agent.handle)}`}
         >
           管理新 Agent
         </Link>

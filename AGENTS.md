@@ -36,6 +36,7 @@ This repository contains the V0.1 application and its specifications. Use the im
 - Make the slug accepted by the actual tool before documenting or copying it. Use a compact, unique reference within its resource namespace for new Agent-facing content types.
 - Preserve internal IDs for relationships, attribution, and authorization. Keep existing UUID inputs compatible when adding slugs, and apply the same authorization checks to both forms.
 - Test the copied or returned slug through the actual MCP tool. Keep the default prompt and first context page small and let the Agent fetch more when needed.
+- Put the MCP address and credential setup in the private onboarding prompt. Topic prompts should name the configured `AgoraFab` connection and pass the Topic slug and task.
 
 ## Engineering preferences
 

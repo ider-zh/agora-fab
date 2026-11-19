@@ -40,23 +40,41 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
     expect(await invitation.locator('input, select, textarea').count()).toBe(0);
     await checkPage(admin, 'Agent invitation');
     await screenshot(admin, 'agent-invite');
+    const [preview] = await Promise.all([
+      admin.waitForResponse(
+        (result) =>
+          new URL(result.url()).pathname ===
+          '/api/community/admin/agents/suggest',
+      ),
+      invite.click(),
+    ]);
+    expect(preview.status()).toBe(200);
+    const { handle, title } = (await preview.json()) as {
+      handle: string;
+      title: string;
+    };
+    expect(title).toBe(handle.replaceAll('_', '-'));
+    expect(await invitation.getByRole('textbox').count()).toBe(0);
+    await invitation.getByText(title, { exact: true }).waitFor();
     const [response] = await Promise.all([
       admin.waitForResponse(
         (result) =>
           new URL(result.url()).pathname === '/api/community/admin/agents',
       ),
-      invite.click(),
+      invitation.getByRole('button', { name: '确认创建' }).click(),
     ]);
     expect(response.status()).toBe(201);
     expect(response.headers()['cache-control']).toBe('no-store');
-    expect(response.request().postDataJSON()).toEqual({});
+    expect(response.request().postDataJSON()).toEqual({
+      suggestedHandle: handle,
+    });
     const secret = admin.getByRole('textbox', {
       name: 'Agent 私密 MCP 接入提示词',
       exact: true,
     });
     await secret.waitFor();
     expect(admin.url()).toBe(`${origin}/admin/agents`);
-    expect(await invite.isEnabled()).toBe(false);
+    expect(await invite.count()).toBe(0);
     // Only a boolean leaves the browser. Forbid token and digest shapes in
     // the public metadata view after the one-time display closes.
     expect(
@@ -72,7 +90,8 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
           control.readOnly === true &&
           /^Authorization: Bearer agf_[A-Za-z0-9_-]{43}$/m.test(value) &&
           value.includes('Streamable HTTP MCP：http://127.0.0.1:3001/mcp') &&
-          /@agent_[a-f0-9]{10}/.test(value) &&
+          /@[a-z]+_[a-z]+/.test(value) &&
+          value.includes('名称填 AgoraFab') &&
           value.includes('新人报道区') &&
           value.includes('get_topic_context（topicId: agent-introductions）') &&
           value.includes('create_post（topicId: agent-introductions,')
@@ -100,18 +119,16 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
     const manage = admin.getByRole('link', { name: '管理新 Agent' });
     await manage.and(admin.locator(':focus')).waitFor();
     await manage.click();
-    await admin.waitForURL(/\/admin\/agents\/agent_[a-f0-9]{10}$/);
+    await admin.waitForURL(`${origin}/admin/agents?agent=${handle}`);
     const profile = admin.getByRole('region', { name: 'Agent 资料' });
     await profile.getByText(ownerHandle, { exact: true }).waitFor();
     await profile.getByText('MCP', { exact: true }).waitFor();
     expect(await profile.getByText('Agent ID', { exact: true }).count()).toBe(
       0,
     );
-    const identity = profile.getByText(/@agent_[a-f0-9]{10}/);
+    const identity = profile.getByText(new RegExp('@' + handle));
     const generatedHandle = await identity.textContent();
-    await admin
-      .getByRole('heading', { name: /^Agent [A-F0-9]{10}$/ })
-      .waitFor();
+    await admin.getByRole('heading', { name: title, exact: true }).waitFor();
 
     const agentUrl = admin.url();
     const rename = admin.getByRole('form', { name: '修改 Agent 名称' });

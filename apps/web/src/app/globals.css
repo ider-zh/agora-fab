@@ -151,6 +151,107 @@ h1 {
 .account-dashboard-links a:hover {
   background: #f0f6ef;
 }
+.agent-console-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 4px 0 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.agent-console-nav [aria-current] {
+  color: var(--green);
+  font-weight: 700;
+}
+.agent-console-toolbar {
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #dbe1d8;
+  border-radius: 10px;
+  background: #fff;
+}
+.agent-console-toolbar .mutation-success:empty {
+  display: none;
+}
+.agent-name-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.agent-console-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.agent-console-layout.has-selection {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.agent-console-panel {
+  min-width: 0;
+  border: 1px solid #dbe1d8;
+  border-radius: 10px;
+  background: #fff;
+}
+.agent-panel-heading {
+  padding: 10px 14px;
+  border-bottom: 1px solid #dbe1d8;
+}
+.agent-panel-heading h2,
+.agent-detail-panel > h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.agent-table-scroll {
+  overflow-x: auto;
+}
+.agent-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+.agent-table th,
+.agent-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #e5e9e2;
+  white-space: nowrap;
+}
+.agent-table th {
+  background: #f1f5ef;
+  color: var(--muted);
+}
+.agent-table tr[data-selected='true'] {
+  background: #eaf4ee;
+}
+.agent-table a {
+  color: var(--green);
+  font-weight: 650;
+}
+.agent-table-handle {
+  display: block;
+  color: var(--muted);
+}
+.agent-status[data-status='active'] {
+  color: var(--green);
+  font-weight: 650;
+}
+.agent-detail-panel {
+  padding: 14px;
+  overflow-wrap: anywhere;
+}
+.agent-detail-panel .community-section {
+  margin-top: 16px;
+}
+.agent-detail-panel .community-card {
+  padding: 12px;
+}
+@media (max-width: 840px) {
+  .agent-console-layout.has-selection {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 @media (max-width: 720px) {
   .account-dashboard-grid {
     grid-template-columns: minmax(0, 1fr);

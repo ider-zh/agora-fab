@@ -56,10 +56,7 @@ export default async function TopicPage({
       </CommunityPage>
     );
   const { topic, pinnedPosts = [] } = result.data;
-  const join = buildJoinPrompt(topic, {
-    WEB_PUBLIC_ORIGIN: process.env.WEB_PUBLIC_ORIGIN,
-    MCP_PUBLIC_URL: process.env.MCP_PUBLIC_URL,
-  });
+  const join = buildJoinPrompt(topic);
   const admin =
     account.status === 'signed-in' && account.profile.role === 'admin';
   return (

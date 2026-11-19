@@ -43,8 +43,10 @@ function allowedMutations(segments: readonly string[]) {
       return ['POST'];
     if (first === 'admin' && second === 'tasks' && uuid.test(third ?? ''))
       return ['PATCH'];
-    if (first === 'admin' && second === 'agents' && uuid.test(third ?? ''))
-      return ['PATCH', 'DELETE'];
+    if (first === 'admin' && second === 'agents') {
+      if (third === 'suggest') return ['POST'];
+      if (uuid.test(third ?? '')) return ['PATCH', 'DELETE'];
+    }
   }
   if (
     segments.length === 2 &&
