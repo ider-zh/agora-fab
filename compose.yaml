@@ -54,7 +54,7 @@ services:
       dockerfile: infra/Dockerfile
       target: api
     environment:
-      <<: *database-env
+      DATABASE_URL: ${API_DATABASE_URL:-postgresql://${POSTGRES_USER:?Run pnpm env:init}:${POSTGRES_PASSWORD:?Run pnpm env:init}@db:5432/${POSTGRES_DB:?Run pnpm env:init}}
       HOST: 0.0.0.0
       PORT: 3001
       NODE_ENV: production

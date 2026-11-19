@@ -9,6 +9,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { communityFixture } from '../integration/community-fixture.js';
 import { callCodex } from './codex.js';
+import {
+  completeReleaseDemo,
+  readDemoPullRequest,
+  releaseIdea,
+} from './release-demo.js';
 import { toolData, type ClientCall, type ClientResult } from './types.js';
 
 async function callHermes(
@@ -72,6 +77,7 @@ interface Post {
   parentPostId: string | null;
 }
 interface Notification {
+  id: string;
   postId: string;
   readAt: string | null;
 }
@@ -92,6 +98,10 @@ async function verifyRest(origin: string, post: Post, expectedAuthor: string) {
 }
 
 async function main() {
+  const demo = readDemoPullRequest(process.env.AGORAFAB_DEMO_PR_URL);
+  const report = (line: string) => {
+    if (!demo) console.log(line);
+  };
   const configDir = await mkdtemp(join(tmpdir(), 'agorafab-mcp-clients-'));
   try {
     const fixture = await communityFixture();
@@ -100,7 +110,10 @@ async function main() {
       const endpoint = `${origin}/mcp`;
       const scopes = ['community:write', 'notifications:read'];
       const agentA = (
-        await fixture.issue(fixture.fixtureIds.agentA, scopes)
+        await fixture.issue(
+          fixture.fixtureIds.agentA,
+          demo ? [...scopes, 'projects:write'] : scopes,
+        )
       ).authorization.slice('Bearer '.length);
       const agentB = (
         await fixture.issue(fixture.fixtureIds.agentB, scopes)
@@ -114,7 +127,7 @@ async function main() {
           arguments: {
             topicId,
             kind: 'idea',
-            bodyMd: 'Codex client compatibility idea.',
+            bodyMd: demo ? releaseIdea : 'Codex client compatibility idea.',
             idempotencyKey: randomUUID(),
           },
         },
@@ -131,17 +144,20 @@ async function main() {
         'Codex create_post',
       ).post;
       await verifyRest(origin, post, fixture.fixtureIds.agentA);
-      console.log(
+      report(
         'Codex app-server discovered the Topic, read bounded context and posted as Agent A.',
       );
 
       const hermes = await callHermes(configDir, endpoint, agentB, [
         { name: 'list_topics', arguments: {} },
+        ...(demo ? [{ name: 'get_post', arguments: { postId: post.id } }] : []),
         {
           name: 'reply_post',
           arguments: {
             postId: post.id,
-            bodyMd: 'Hermes verified the idea. @fixture_agent_a',
+            bodyMd: demo
+              ? `The source idea calls for preserving provenance and independent review. Use [this implementation PR](${demo.url}) as the artifact and verify that the project still links the original idea before acceptance. @fixture_agent_a`
+              : 'Hermes verified the idea. @fixture_agent_a',
             mentions: ['fixture_agent_a'],
             idempotencyKey: randomUUID(),
           },
@@ -153,12 +169,19 @@ async function main() {
         ),
       );
       const reply = toolData<{ post: Post }>(
-        hermes[1],
+        hermes[demo ? 2 : 1],
         'Hermes reply_post',
       ).post;
+      if (demo) {
+        const { post: readIdea } = toolData<{
+          post: Post & { bodyMd: string };
+        }>(hermes[1], 'Hermes get_post');
+        assert.equal(readIdea.id, post.id);
+        assert.equal(readIdea.bodyMd, releaseIdea);
+      }
       assert.equal(reply.parentPostId, post.id);
       await verifyRest(origin, reply, fixture.fixtureIds.agentB);
-      console.log(
+      report(
         'Hermes Agent read the Topic and replied as Agent B. REST confirmed both attributions.',
       );
 
@@ -173,9 +196,23 @@ async function main() {
         notifications.items.map(({ postId, readAt }) => ({ postId, readAt })),
         [{ postId: reply.id, readAt: null }],
       );
-      console.log(
+      report(
         'A fresh Codex app-server connection received exactly one unread notification for the Hermes reply.',
       );
+      if (demo) {
+        const notificationId = notifications.items[0]?.id;
+        assert.ok(notificationId);
+        const proof = await completeReleaseDemo({
+          fixture,
+          origin,
+          ideaId: post.id,
+          replyId: reply.id,
+          notificationId,
+          pullRequest: demo,
+          callAgentA: (calls) => callCodex(configDir, endpoint, agentA, calls),
+        });
+        console.log(JSON.stringify(proof, null, 2));
+      }
     } finally {
       await fixture.close();
     }
@@ -191,7 +228,7 @@ try {
   // phase labels or our own bounded error messages, never process output.
   if (
     error instanceof Error &&
-    /^(Codex app-server|Hermes MCP client|Set HERMES|[a-zA-Z]+ (?:list_topics|get_topic_context|create_post|reply_post|get_notifications) )/.test(
+    /^(Codex app-server|Hermes MCP client|Set HERMES|AGORAFAB_DEMO_PR_URL|Release demo received HTTP|[a-zA-Z]+ (?:list_topics|get_topic_context|get_post|create_post|reply_post|get_notifications|list_tasks|claim_task|submit_artifact) )/.test(
       error.message,
     )
   ) {

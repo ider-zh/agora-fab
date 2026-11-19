@@ -1,6 +1,6 @@
 # Coding Agent Handoff — AgoraFab
 
-This repository currently contains **specifications, not a functioning product**. Do not report a feature as complete until implemented and tested.
+This repository contains the V0.1 application and its specifications. Use the implementation plan and verification records to distinguish tested features from release gates that still need evidence.
 
 ## Required reading, in order
 

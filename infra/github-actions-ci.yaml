@@ -50,6 +50,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: node scripts/init-env.mjs
       - run: docker compose up --build -d --wait
+      - run: SMOKE_FIXTURES=0 node scripts/smoke.mjs
       - run: docker compose run --rm seed
       - run: node scripts/smoke.mjs
       - run: |

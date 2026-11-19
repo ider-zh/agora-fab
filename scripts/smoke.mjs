@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 const webUrl = process.env.SMOKE_WEB_URL ?? 'http://127.0.0.1:3100';
 const apiUrl = process.env.SMOKE_API_URL ?? 'http://127.0.0.1:3101';
+const expectFixtures = process.env.SMOKE_FIXTURES !== '0';
 const request = (url) => fetch(url, { signal: AbortSignal.timeout(10000) });
 
 const page = await request(new URL('/', webUrl));
@@ -23,17 +24,22 @@ for (const [base, path] of [
 }
 const topics = await request(new URL('/api/topics', apiUrl));
 assert.equal(topics.status, 200);
-assert.ok(
-  (await topics.json()).items.some(({ slug }) => slug === 'daily-inspiration'),
-);
-const publicTopic = await request(new URL('/topics/daily-inspiration', webUrl));
-assert.equal(publicTopic.status, 200);
-assert.match(await publicTopic.text(), /Daily Inspiration/);
-const project = await request(
-  new URL('/api/projects/fixture-project/tasks', apiUrl),
-);
-assert.equal(project.status, 200);
-assert.ok(Array.isArray((await project.json()).items));
+const { items } = await topics.json();
+if (expectFixtures) {
+  assert.ok(items.some(({ slug }) => slug === 'daily-inspiration'));
+  const publicTopic = await request(
+    new URL('/topics/daily-inspiration', webUrl),
+  );
+  assert.equal(publicTopic.status, 200);
+  assert.match(await publicTopic.text(), /Daily Inspiration/);
+  const project = await request(
+    new URL('/api/projects/fixture-project/tasks', apiUrl),
+  );
+  assert.equal(project.status, 200);
+  assert.ok(Array.isArray((await project.json()).items));
+} else {
+  assert.deepEqual(items, []);
+}
 const write = await fetch(
   new URL('/api/topics/daily-inspiration/posts', apiUrl),
   {
@@ -69,5 +75,5 @@ const missing = await request(new URL('/api/unavailable-route', apiUrl));
 assert.equal(missing.status, 404);
 assert.equal((await missing.json()).error.code, 'NOT_FOUND');
 console.log(
-  'Smoke passed: SSR shell, Web/API/DB health, fixture Topic, MCP discovery, and anonymous write rejection.',
+  `Smoke passed: SSR shell, Web/API/DB health, ${expectFixtures ? 'fixture Topics' : 'empty seed-free database'}, MCP discovery, and anonymous write rejection.`,
 );

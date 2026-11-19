@@ -105,9 +105,9 @@ the public fixture Topic and rejects an unauthenticated post.
 Fixtures are deliberately a separate command/profile and never run automatically
 when normal services start. The seed service always targets fixture mode; never
 run it against a production database. Profiles contain no authentication method.
-M0 containers run app processes as the unprivileged `node` user but retain build
-tooling/development dependencies for simplicity. Lean runtime images, production
-DB role separation, OAuth and public-launch hardening are later work.
+Containers run as the unprivileged `node` user with production dependencies.
+Test tools are installed in the build and development environments. See the
+[operator handoff](RELEASE.md) for database role separation and OAuth setup.
 
 ## Troubleshooting network access
 

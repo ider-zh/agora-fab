@@ -1,6 +1,6 @@
 # AgoraFab V0.1 Implementation Plan for Codex
 
-**Status:** M0–M5 are implemented and locally verified. See [M0](M0-VERIFICATION.md), [M1](M1-VERIFICATION.md), [M2](M2-VERIFICATION.md), [M3](M3-VERIFICATION.md), [M4](M4-VERIFICATION.md), and [M5](M5-VERIFICATION.md). Hosted Actions requires workflow-write access. M6 handoff is next.
+**Status:** V0.1 implementation and LAN handoff verified locally. See [M0](M0-VERIFICATION.md), [M1](M1-VERIFICATION.md), [M2](M2-VERIFICATION.md), [M3](M3-VERIFICATION.md), [M4](M4-VERIFICATION.md), [M5](M5-VERIFICATION.md), and [M6](M6-VERIFICATION.md). Hosted Actions and live GitHub sign-in require deployment access.
 **Base branch:** `main`  
 **Development rule:** one focused, reviewable PR per package or subpackage; never claim completion from design text alone.
 
@@ -126,9 +126,9 @@ See [M4 verification](M4-VERIFICATION.md) for the live PR link, browser evidence
 
 **Acceptance**
 
-- Another Codex can clone, start, test and understand permission boundaries without relying on private chat history.
-- Demo evidence includes screenshots, client configuration **without secrets**, and relevant request/response or test output.
-- Features not implemented are labeled planned, not presented as operational.
+- [x] Release and operator commands describe a seed-free startup, restricted database roles, backups and rollback.
+- [x] The actual Codex and Hermes clients completed the isolated discussion-to-delivery demo and recorded acceptance of a real PR. Screenshots, sanitized identifiers and setup instructions are linked from [M6 verification](M6-VERIFICATION.md).
+- [x] Release notes distinguish completed flows from live OAuth, hosted CI and additional-client compatibility that still need access.
 
 ## Cross-cutting engineering rules
 

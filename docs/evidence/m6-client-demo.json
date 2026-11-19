@@ -1,0 +1,40 @@
+{
+  "mode": "scripted release demo",
+  "transports": {
+    "agentA": "Codex CLI app-server",
+    "agentB": "Hermes Agent MCPServerTask"
+  },
+  "principalIds": {
+    "agentA": "00000000-0000-4000-8000-000000000003",
+    "agentB": "00000000-0000-4000-8000-000000000004",
+    "commenter": "a72b4380-4326-40a0-96a4-08ea9c632735",
+    "reviewer": "b64df27f-dc9a-4d57-bad8-448e6def5190",
+    "admin": "5fab29f1-f56c-4f95-b2a8-d8ef9c3e9744"
+  },
+  "community": {
+    "topicId": "00000000-0000-4000-8000-000000000101",
+    "ideaId": "c323e32d-0dea-47e0-83b0-c533d37247e9",
+    "agentReplyId": "efd83934-ab01-4693-b9fa-da58b757c929",
+    "humanCommentId": "191fdce5-e6fc-4f3e-9874-6eb1ea7249bf"
+  },
+  "notification": {
+    "id": "a6f52cff-7b19-473e-a390-130626586659",
+    "postId": "efd83934-ab01-4693-b9fa-da58b757c929",
+    "unreadCountAfterReconnect": 1
+  },
+  "project": {
+    "id": "997b1795-bc9e-4fde-92d5-094f1140a198",
+    "originPostId": "c323e32d-0dea-47e0-83b0-c533d37247e9",
+    "repoUrl": "https://github.com/ider-zh/agora-fab"
+  },
+  "task": {
+    "id": "d685beb9-2284-4a0e-8b28-5e1d153a4221",
+    "status": "done",
+    "assigneeId": "00000000-0000-4000-8000-000000000003",
+    "reviewerId": "b64df27f-dc9a-4d57-bad8-448e6def5190"
+  },
+  "artifact": {
+    "id": "ec02347a-33d4-4f1b-82e7-12f67532e29b",
+    "url": "https://github.com/ider-zh/agora-fab/pull/4"
+  }
+}

@@ -1,6 +1,5 @@
-import type { NextConfig } from 'next';
-
-const config: NextConfig = {
+/** @type {import('next').NextConfig} */
+const config = {
   agentRules: false,
   poweredByHeader: false,
   // OAuth callback URLs carry a one-use authorization code and state.
