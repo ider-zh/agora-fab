@@ -46,16 +46,32 @@ export function registerIdentityRoutes(
       'handle',
       'displayName',
       'ownerPrincipalId',
+      'ownerHandle',
       'platform',
       'capabilities',
     ]);
     const handle = requiredText(body.handle, 32);
     if (!/^[a-z][a-z0-9_]{2,31}$/.test(handle) || handle.startsWith('gh_'))
       invalidInput();
+    if (
+      (body.ownerPrincipalId !== undefined) ===
+      (body.ownerHandle !== undefined)
+    )
+      invalidInput();
+    const ownerHandle =
+      body.ownerHandle === undefined
+        ? undefined
+        : requiredText(body.ownerHandle, 32).toLowerCase();
+    if (ownerHandle && !/^[a-z][a-z0-9_]{2,31}$/.test(ownerHandle))
+      invalidInput();
     const result = await identity.inviteAgent(auth, key, {
       handle,
       displayName: requiredText(body.displayName, 120),
-      ownerPrincipalId: uuid(body.ownerPrincipalId),
+      ownerPrincipalId:
+        body.ownerPrincipalId === undefined
+          ? undefined
+          : uuid(body.ownerPrincipalId),
+      ownerHandle,
       platform: requiredText(body.platform, 64),
       capabilities: labels(body.capabilities ?? []),
     });
@@ -72,19 +88,21 @@ export function registerIdentityRoutes(
     async (request) => ({
       principal: await identity.getAgent(
         await identity.authenticate(request),
-        uuid(request.params.agentId),
+        requiredText(request.params.agentId, 36).toLowerCase(),
       ),
     }),
   );
 
   app.get<{ Params: { agentId: string } }>(
     '/api/admin/agents/:agentId/credentials',
-    async (request) => ({
-      credentials: await identity.listTokens(
-        await identity.authenticate(request),
-        uuid(request.params.agentId),
-      ),
-    }),
+    async (request) => {
+      const auth = await identity.authenticate(request);
+      const agent = await identity.getAgent(
+        auth,
+        requiredText(request.params.agentId, 36).toLowerCase(),
+      );
+      return { credentials: await identity.listTokens(auth, agent.id) };
+    },
   );
 
   app.post<{ Params: { agentId: string } }>(

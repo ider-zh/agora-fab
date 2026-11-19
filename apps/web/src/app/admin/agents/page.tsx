@@ -62,7 +62,7 @@ export default async function AgentsAdmin({
                   <li className="community-card" key={agent.id}>
                     <h3>
                       <Link
-                        href={`/admin/agents/${encodeURIComponent(agent.id)}`}
+                        href={`/admin/agents/${encodeURIComponent(agent.handle)}`}
                       >
                         {agent.displayName}
                       </Link>
@@ -72,7 +72,7 @@ export default async function AgentsAdmin({
                       {agent.status === 'active' ? '有效' : '已撤销'}
                     </p>
                     <p className="community-meta">
-                      所有者 ID <code>{agent.ownerPrincipalId}</code>
+                      所有者 <code>@{agent.ownerHandle}</code>
                     </p>
                   </li>
                 ))}

@@ -1,3 +1,4 @@
+import { expandResourceId } from '../../packages/mcp/src/references.js';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { digest } from '../../apps/api/src/auth/http.js';
@@ -213,14 +214,14 @@ export async function completeReleaseDemo({
   const listings = toolData<{ items: Task[] }>(results[0], 'Codex list_tasks');
   assert.ok(
     listings.items.some(
-      (item) => item.id === task.id && item.status === 'open',
+      (item) => expandResourceId(item.id) === task.id && item.status === 'open',
     ),
   );
   const { task: claimed } = toolData<{ task: Task }>(
     results[1],
     'Codex claim_task',
   );
-  assert.equal(claimed.assigneeId, fixtureIds.agentA);
+  assert.equal(expandResourceId(claimed.assigneeId ?? ''), fixtureIds.agentA);
   assert.equal(claimed.status, 'claimed');
   const { task: submitted, artifact } = toolData<{
     task: Task;
@@ -228,7 +229,7 @@ export async function completeReleaseDemo({
   }>(results[2], 'Codex submit_artifact');
   assert.equal(submitted.status, 'submitted');
   assert.equal(artifact.url, pullRequest.url);
-  assert.equal(artifact.submittedBy, fixtureIds.agentA);
+  assert.equal(expandResourceId(artifact.submittedBy), fixtureIds.agentA);
 
   const taskPath = '/api/tasks/' + task.id;
   const reviewNote =
@@ -264,7 +265,13 @@ export async function completeReleaseDemo({
   assert.equal(saved.assigneeId, fixtureIds.agentA);
   assert.deepEqual(
     artifacts.map(({ id, url, submittedBy }) => ({ id, url, submittedBy })),
-    [{ id: artifact.id, url: pullRequest.url, submittedBy: fixtureIds.agentA }],
+    [
+      {
+        id: expandResourceId(artifact.id),
+        url: pullRequest.url,
+        submittedBy: fixtureIds.agentA,
+      },
+    ],
   );
   const { post: preserved, replies } = await request<{
     post: Post;
@@ -317,6 +324,6 @@ export async function completeReleaseDemo({
       assigneeId: saved.assigneeId,
       reviewerId: saved.reviewerId,
     },
-    artifact: { id: artifact.id, url: pullRequest.url },
+    artifact: { id: expandResourceId(artifact.id), url: pullRequest.url },
   };
 }

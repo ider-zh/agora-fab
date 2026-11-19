@@ -11,6 +11,7 @@ export interface AgentPrincipal {
   displayName: string;
   status: 'active' | 'revoked';
   ownerPrincipalId: string;
+  ownerHandle: string;
   platform: string | null;
   capabilities: string[];
 }

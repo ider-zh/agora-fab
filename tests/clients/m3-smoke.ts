@@ -1,3 +1,4 @@
+import { expandResourceId } from '../../packages/mcp/src/references.js';
 // Run from the repository root with TEST_DATABASE_URL set, a Codex CLI on PATH,
 // HERMES_AGENT_DIR set to the Hermes checkout, and HERMES_PYTHON set to its runtime.
 import assert from 'node:assert/strict';
@@ -85,16 +86,27 @@ interface Page<T> {
   items: T[];
 }
 
-async function verifyRest(origin: string, post: Post, expectedAuthor: string) {
-  assert.equal(post.author.id, expectedAuthor);
+async function verifyRest(
+  origin: string,
+  post: Post,
+  expectedAuthor: string,
+  expectedHandle: string,
+) {
+  assert.equal(post.author.id, expectedHandle);
   assert.equal(post.author.kind, 'agent');
-  const response = await fetch(`${origin}/api/posts/${post.id}`, {
-    signal: AbortSignal.timeout(5000),
-  });
+  const response = await fetch(
+    `${origin}/api/posts/${expandResourceId(post.id)}`,
+    {
+      signal: AbortSignal.timeout(5000),
+    },
+  );
   assert.equal(response.status, 200);
   const { post: rest } = (await response.json()) as { post: Post };
   assert.equal(rest.author.id, expectedAuthor);
-  assert.equal(rest.parentPostId, post.parentPostId);
+  assert.equal(
+    rest.parentPostId,
+    post.parentPostId && expandResourceId(post.parentPostId),
+  );
 }
 
 async function main() {
@@ -118,7 +130,7 @@ async function main() {
       const agentB = (
         await fixture.issue(fixture.fixtureIds.agentB, scopes)
       ).authorization.slice('Bearer '.length);
-      const topicId = fixture.fixtureIds.community;
+      const topicId = 'daily-inspiration';
       const results = await callCodex(configDir, endpoint, agentA, [
         { name: 'list_topics', arguments: {} },
         { name: 'get_topic_context', arguments: { topicId } },
@@ -143,7 +155,12 @@ async function main() {
         results[2],
         'Codex create_post',
       ).post;
-      await verifyRest(origin, post, fixture.fixtureIds.agentA);
+      await verifyRest(
+        origin,
+        post,
+        fixture.fixtureIds.agentA,
+        'fixture_agent_a',
+      );
       report(
         'Codex app-server discovered the Topic, read bounded context and posted as Agent A.',
       );
@@ -180,7 +197,12 @@ async function main() {
         assert.equal(readIdea.bodyMd, releaseIdea);
       }
       assert.equal(reply.parentPostId, post.id);
-      await verifyRest(origin, reply, fixture.fixtureIds.agentB);
+      await verifyRest(
+        origin,
+        reply,
+        fixture.fixtureIds.agentB,
+        'fixture_agent_b',
+      );
       report(
         'Hermes Agent read the Topic and replied as Agent B. REST confirmed both attributions.',
       );
@@ -205,9 +227,9 @@ async function main() {
         const proof = await completeReleaseDemo({
           fixture,
           origin,
-          ideaId: post.id,
-          replyId: reply.id,
-          notificationId,
+          ideaId: expandResourceId(post.id),
+          replyId: expandResourceId(reply.id),
+          notificationId: expandResourceId(notificationId),
           pullRequest: demo,
           callAgentA: (calls) => callCodex(configDir, endpoint, agentA, calls),
         });

@@ -1,3 +1,4 @@
+import { shortResourceId } from '../../packages/mcp/src/references.js';
 import { randomUUID } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -171,20 +172,30 @@ describe('project incubation through REST and MCP', () => {
         arguments: { topicId: project.id },
       });
       expect(listing.structuredContent).toMatchObject({
-        items: [expect.objectContaining({ id: proposed.id, status: 'open' })],
+        items: [
+          expect.objectContaining({
+            id: shortResourceId(proposed.id),
+            status: 'open',
+          }),
+        ],
       });
       const context = await agentA.callTool({
         name: 'get_topic_context',
         arguments: { topicId: project.id },
       });
       expect(context.structuredContent).toMatchObject({
-        openTasks: [expect.objectContaining({ id: proposed.id })],
+        openTasks: [
+          expect.objectContaining({ id: shortResourceId(proposed.id) }),
+        ],
       });
 
       const claim = (client: Client) =>
         client.callTool({
           name: 'claim_task',
-          arguments: { taskId: proposed.id, idempotencyKey: randomUUID() },
+          arguments: {
+            taskId: shortResourceId(proposed.id),
+            idempotencyKey: randomUUID(),
+          },
         });
       const [a, b] = await Promise.all([claim(agentA), claim(agentB)]);
       expect([a, b].filter((value) => !value.isError)).toHaveLength(1);
@@ -224,8 +235,8 @@ describe('project incubation through REST and MCP', () => {
       });
       expect(submitted.isError).not.toBe(true);
       expect(submitted.structuredContent).toMatchObject({
-        task: { status: 'submitted', assigneeId: winnerId },
-        artifact: { submittedBy: winnerId, url: artifact.url },
+        task: { status: 'submitted', assigneeId: shortResourceId(winnerId) },
+        artifact: { submittedBy: shortResourceId(winnerId), url: artifact.url },
       });
       const replay = await app.inject({
         method: 'POST',

@@ -7,6 +7,8 @@ import {
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
+import { compactContentReferences } from './references.js';
+export { expandResourceId } from './references.js';
 
 export { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 
@@ -14,12 +16,15 @@ const page = {
   cursor: z.string().max(240).optional(),
   limit: z.number().int().min(1).max(50).optional(),
 };
-const id = z.string().regex(/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i);
+const id = z
+  .string()
+  .regex(/^(?:[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}|~[A-Za-z0-9_-]{22})$/i)
+  .describe('Short reference returned by AgoraFab, or a legacy UUID.');
 const topicId = z
   .string()
   .min(1)
   .max(100)
-  .describe('Topic slug (preferred) or UUID.');
+  .describe('Topic slug (preferred), short reference, or legacy UUID.');
 const idempotencyKey = z.string().regex(/^[a-zA-Z0-9:._-]{1,128}$/);
 const post = {
   bodyMd: z.string().min(1).max(12_000),
@@ -127,7 +132,12 @@ function defineTool<T extends z.ZodType>(
           'VALIDATION_ERROR',
           'Invalid tool arguments.',
         );
-      return output(await action(result.data));
+      return output(
+        compactContentReferences(await action(result.data)) as Record<
+          string,
+          unknown
+        >,
+      );
     },
   };
 }
