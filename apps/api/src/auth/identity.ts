@@ -15,6 +15,7 @@ import {
   type Principal,
 } from '@agorafab/domain';
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { FastifyRequest } from 'fastify';
 import { randomBytes } from 'node:crypto';
 import {
@@ -25,6 +26,7 @@ import {
   type ListPageOptions,
 } from '../community/cursor.js';
 import { idempotent } from '../idempotency.js';
+import { uuidPattern } from '../http-validation.js';
 import type { AuthorizeMutation } from '../traffic.js';
 import {
   agentTokenPattern,
@@ -67,6 +69,8 @@ interface LoginSource {
   githubAdminIds?: ReadonlySet<string>;
   localEnabled?: boolean;
 }
+
+const agentOwner = alias(principals, 'agent_owner');
 
 export function createIdentityService(
   database: Database,
@@ -180,7 +184,8 @@ export function createIdentityService(
     input: {
       handle: string;
       displayName: string;
-      ownerPrincipalId: string;
+      ownerPrincipalId?: string;
+      ownerHandle?: string;
       platform: string;
       capabilities: string[];
     },
@@ -198,7 +203,9 @@ export function createIdentityService(
           .from(principals)
           .where(
             and(
-              eq(principals.id, input.ownerPrincipalId),
+              input.ownerPrincipalId
+                ? eq(principals.id, input.ownerPrincipalId)
+                : eq(principals.handle, input.ownerHandle ?? ''),
               eq(principals.kind, 'human'),
               eq(principals.status, 'active'),
             ),
@@ -212,7 +219,14 @@ export function createIdentityService(
           );
         const [row] = await tx
           .insert(principals)
-          .values({ ...input, kind: 'agent' })
+          .values({
+            handle: input.handle,
+            displayName: input.displayName,
+            ownerPrincipalId: owner.id,
+            platform: input.platform,
+            capabilities: input.capabilities,
+            kind: 'agent',
+          })
           .onConflictDoNothing({ target: principals.handle })
           .returning();
         if (!row)
@@ -389,9 +403,11 @@ export function createIdentityService(
     const rows = await database.db
       .select({
         principal: principals,
+        ownerHandle: agentOwner.handle,
         createdAt: cursorTimestamp(principals.createdAt),
       })
       .from(principals)
+      .innerJoin(agentOwner, eq(agentOwner.id, principals.ownerPrincipalId))
       .where(
         and(
           eq(principals.kind, 'agent'),
@@ -401,8 +417,9 @@ export function createIdentityService(
       .orderBy(desc(principals.createdAt), desc(principals.id))
       .limit(limit + 1);
     return slicePage(
-      rows.map(({ principal, createdAt }) => ({
+      rows.map(({ principal, ownerHandle, createdAt }) => ({
         ...serializePrincipal(principal),
+        ownerHandle,
         createdAt,
       })),
       limit,
@@ -410,14 +427,25 @@ export function createIdentityService(
     );
   }
 
-  async function getAgent(auth: AuthContext | null, agentId: string) {
+  async function getAgent(auth: AuthContext | null, reference: string) {
     requireAction(auth, 'admin');
     const [row] = await database.db
-      .select()
+      .select({ principal: principals, ownerHandle: agentOwner.handle })
       .from(principals)
-      .where(and(eq(principals.kind, 'agent'), eq(principals.id, agentId)));
+      .innerJoin(agentOwner, eq(agentOwner.id, principals.ownerPrincipalId))
+      .where(
+        and(
+          eq(principals.kind, 'agent'),
+          uuidPattern.test(reference)
+            ? eq(principals.id, reference)
+            : eq(principals.handle, reference),
+        ),
+      );
     if (!row) throw new DomainError(404, 'AGENT_NOT_FOUND', 'Agent not found.');
-    return serializePrincipal(row);
+    return {
+      ...serializePrincipal(row.principal),
+      ownerHandle: row.ownerHandle,
+    };
   }
 
   async function listTokens(auth: AuthContext | null, agentId: string) {

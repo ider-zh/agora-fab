@@ -1,3 +1,7 @@
+import {
+  expandResourceId,
+  shortResourceId,
+} from '../../packages/mcp/src/references.js';
 import { randomUUID } from 'node:crypto';
 import { request as requestHttp, type IncomingMessage } from 'node:http';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -60,7 +64,7 @@ type Posted = { id: string; author: { id: string } };
 function expectPost(result: CallToolResult, authorId: string) {
   expect(result.isError).toBeUndefined();
   expect(result.structuredContent?.post).toMatchObject({
-    id: expect.any(String),
+    id: expect.stringMatching(/^~[A-Za-z0-9_-]{22}$/),
     author: { id: authorId },
   });
   return result.structuredContent?.post as Posted;
@@ -136,13 +140,11 @@ describe('official SDK clients over Streamable HTTP', () => {
       );
       const post = expectPost(
         await tool(first, 'create_post', input),
-        fixture.fixtureIds.agentA,
+        'fixture_agent_a',
       );
       expect(
-        expectPost(
-          await tool(first, 'create_post', input),
-          fixture.fixtureIds.agentA,
-        ).id,
+        expectPost(await tool(first, 'create_post', input), 'fixture_agent_a')
+          .id,
       ).toBe(post.id);
       const replay = await fixture.app.inject({
         method: 'POST',
@@ -152,7 +154,7 @@ describe('official SDK clients over Streamable HTTP', () => {
       });
       expect(replay.statusCode).toBe(200);
       expect(replay.json().post).toMatchObject({
-        id: post.id,
+        id: expandResourceId(post.id),
         author: { id: fixture.fixtureIds.agentA },
       });
       expectToolError(
@@ -169,7 +171,7 @@ describe('official SDK clients over Streamable HTTP', () => {
             bodyMd: 'Thank you @fixture_agent_a for your post.',
             idempotencyKey: randomUUID(),
           }),
-          fixture.fixtureIds.agentB,
+          'fixture_agent_b',
         );
         const otherInbox = await tool(second, 'get_notifications');
         expect(otherInbox.structuredContent?.items).toEqual([]);
@@ -238,7 +240,9 @@ describe('official SDK clients over Streamable HTTP', () => {
         payload: { bodyMd: `${marker} ${'🌿'.repeat(4900)}` },
       });
       expect(response.statusCode).toBe(201);
-      ids.push(response.json<{ post: { id: string } }>().post.id);
+      ids.push(
+        shortResourceId(response.json<{ post: { id: string } }>().post.id),
+      );
     }
     await withClient({}, async (client) => {
       const first = await tool(client, 'get_topic_context', {

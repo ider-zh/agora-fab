@@ -1,6 +1,6 @@
 import type { Database } from '@agorafab/db';
 import { DomainError, type AuthContext } from '@agorafab/domain';
-import type { McpActions } from '@agorafab/mcp';
+import { expandResourceId, type McpActions } from '@agorafab/mcp';
 import { createInbox } from '../community/inbox.js';
 import { postInput } from '../community/input.js';
 import { createCommunityReader } from '../community/read.js';
@@ -62,7 +62,7 @@ export function createMcpActions(
     list_topics: (page) =>
       reader.listTopics({ ...page, limit: Math.min(page.limit ?? 10, 20) }),
     async get_topic_context({ topicId, cursor, limit }) {
-      const topic = await reader.getTopic(topicId);
+      const topic = await reader.getTopic(expandResourceId(topicId));
       const [pinned, recent, projectTasks] = await Promise.all([
         reader.listPinned(topic.id, 3),
         reader.listPosts(topic.id, {
@@ -127,12 +127,12 @@ export function createMcpActions(
       return context;
     },
     list_posts: ({ topicId, ...page }) =>
-      reader.listPosts(topicId, {
+      reader.listPosts(expandResourceId(topicId), {
         ...page,
         limit: Math.min(page.limit ?? 10, 20),
       }),
     get_post: ({ postId, ...page }) =>
-      reader.getPost(uuid(postId), {
+      reader.getPost(uuid(expandResourceId(postId)), {
         ...page,
         limit: Math.min(page.limit ?? 10, 20),
       }),
@@ -140,7 +140,7 @@ export function createMcpActions(
       const { post } = await writer.publish(
         identity,
         idempotencyKey,
-        { topic: topicId },
+        { topic: expandResourceId(topicId) },
         postInput(body),
       );
       return { post };
@@ -149,7 +149,7 @@ export function createMcpActions(
       const { post } = await writer.publish(
         identity,
         idempotencyKey,
-        { parent: uuid(postId) },
+        { parent: uuid(expandResourceId(postId)) },
         postInput(body),
       );
       return { post };
@@ -159,7 +159,7 @@ export function createMcpActions(
     projects: tasks
       ? {
           list_tasks: ({ topicId, ...page }) =>
-            tasks.listTasks(topicId, {
+            tasks.listTasks(expandResourceId(topicId), {
               ...page,
               limit: Math.min(page.limit ?? 10, 20),
             }),
@@ -167,7 +167,7 @@ export function createMcpActions(
             const { task } = await tasks.claim(
               identity,
               idempotencyKey,
-              uuid(taskId),
+              uuid(expandResourceId(taskId)),
             );
             return { task };
           },
@@ -175,7 +175,7 @@ export function createMcpActions(
             const { task, artifact } = await tasks.submit(
               identity,
               idempotencyKey,
-              uuid(taskId),
+              uuid(expandResourceId(taskId)),
               submitArtifactInput(body),
             );
             return { task, artifact };

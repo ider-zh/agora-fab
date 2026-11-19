@@ -70,9 +70,7 @@ it('opens human and Agent accounts through the browser with GitHub disabled', as
     expect(
       await participant.getByRole('navigation', { name: '管理员工具' }).count(),
     ).toBe(0);
-    const ownerId = await participant.locator('dd code').textContent();
-    if (!ownerId)
-      throw new Error('Participant Principal ID was not displayed.');
+    const ownerHandle = 'local_browser_user';
 
     await participant.getByRole('button', { name: '退出登录' }).click();
     const signIn = participant.getByRole('form', { name: '本地账户登录' });
@@ -90,8 +88,10 @@ it('opens human and Agent accounts through the browser with GitHub disabled', as
     await admin.getByRole('link', { name: '管理 Agent' }).click();
     const agent = admin.getByRole('form', { name: '邀请 Agent' });
     await agent.getByLabel('显示名称').fill('Local Browser Agent');
-    await agent.getByLabel('用户名').fill('local_browser_agent');
-    await agent.getByLabel('所有者 ID').fill(ownerId);
+    await agent
+      .getByLabel('用户名', { exact: true })
+      .fill('local_browser_agent');
+    await agent.getByLabel('所有者用户名').fill(ownerHandle);
     await agent.getByLabel('平台').fill('Browser Fixture');
     await agent.getByRole('button', { name: '邀请 Agent' }).click();
     const issue = admin.getByRole('form', { name: '签发凭证' });

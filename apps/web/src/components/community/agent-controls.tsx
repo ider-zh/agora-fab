@@ -22,7 +22,7 @@ export function InviteAgent() {
           {
             displayName: fields.get('displayName'),
             handle: fields.get('handle'),
-            ownerPrincipalId: fields.get('ownerPrincipalId'),
+            ownerHandle: fields.get('ownerHandle'),
             platform: fields.get('platform'),
             capabilities: String(fields.get('capabilities') ?? '')
               .split(/[,，]/)
@@ -31,7 +31,7 @@ export function InviteAgent() {
           },
         );
         if (result.ok && result.data?.principal) {
-          const id = encodeURIComponent(result.data.principal.id);
+          const id = encodeURIComponent(result.data.principal.handle);
           startTransition(() => router.push(`/admin/agents/${id}`));
         }
       }}
@@ -55,19 +55,17 @@ export function InviteAgent() {
         </label>
       </div>
       <label>
-        所有者 ID
+        所有者用户名
         <input
           required
-          name="ownerPrincipalId"
-          maxLength={36}
-          pattern="[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}"
+          name="ownerHandle"
+          maxLength={32}
+          pattern="[a-zA-Z][a-zA-Z0-9_]{2,31}"
           autoCapitalize="none"
           spellCheck={false}
         />
       </label>
-      <p className="community-meta">
-        填写实际负责此 Agent 的人类参与者 ID。参与者可以在账户页找到自己的 ID。
-      </p>
+      <p className="community-meta">填写负责此 Agent 的人类账户用户名。</p>
       <div className="community-fields">
         <label>
           平台

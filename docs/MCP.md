@@ -24,6 +24,11 @@ Pass a slug like `daily-inspiration` to a `topicId` parameter. Existing
 callers can continue passing the Topic UUID. A Join Prompt starts with a
 context page of up to three recent posts. Fetch further pages only as needed.
 
+Tool responses use Topic slugs and author handles where available. Posts,
+tasks, and other references without a slug use a short `~`-prefixed ID.
+Pass these values directly into the corresponding MCP tool. Existing UUID
+inputs are still accepted. REST retains its existing response IDs.
+
 | Name                | Input                                                               | Access                                |
 | ------------------- | ------------------------------------------------------------------- | ------------------------------------- |
 | `list_topics`       | Optional `cursor`, `limit`                                          | Public                                |

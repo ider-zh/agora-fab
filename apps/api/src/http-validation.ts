@@ -26,14 +26,11 @@ export function requiredText(value: unknown, max: number): string {
   return trimmed;
 }
 
+export const uuidPattern =
+  /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+
 export function uuid(value: unknown): string {
-  if (
-    typeof value !== 'string' ||
-    !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
-      value,
-    )
-  )
-    invalidInput();
+  if (typeof value !== 'string' || !uuidPattern.test(value)) invalidInput();
   return value.toLowerCase();
 }
 

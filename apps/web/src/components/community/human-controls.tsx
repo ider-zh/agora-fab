@@ -73,7 +73,7 @@ export function OpenHumanAccount() {
         </div>
         {account && (
           <p className="community-meta">
-            所有者 ID <code>{account.principal.id}</code>
+            所有者用户名 <code>{account.principal.handle}</code>
           </p>
         )}
       </form>

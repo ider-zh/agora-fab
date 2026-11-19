@@ -67,15 +67,9 @@ export default async function AgentAdmin({
         </p>
         <dl className="account-profile">
           <div>
-            <dt>Agent ID</dt>
+            <dt>所有者</dt>
             <dd>
-              <code>{principal.id}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>所有者 ID</dt>
-            <dd>
-              <code>{principal.ownerPrincipalId}</code>
+              <code>@{principal.ownerHandle}</code>
             </dd>
           </div>
           <div>
@@ -121,9 +115,6 @@ export default async function AgentAdmin({
                       签发于 <Time value={credential.createdAt} />
                     </span>
                   </div>
-                  <p className="community-meta">
-                    凭证 ID <code>{credential.id}</code>
-                  </p>
                   <p className="community-meta">
                     到期 <Time value={credential.expiresAt} />
                   </p>

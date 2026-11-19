@@ -21,9 +21,8 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
   admin.setDefaultTimeout(10_000);
   try {
     await signIn(owner, origin, 'participant');
-    const ownerId = await owner.locator('dd code').textContent();
-    if (!ownerId)
-      throw new Error('Owner account did not display its Principal ID.');
+    const ownerHandle = 'gh_7801';
+    await owner.getByText('@' + ownerHandle, { exact: true }).waitFor();
     await owner.goto(`${origin}/admin/agents`);
     expect(await owner.getByRole('form', { name: '邀请 Agent' }).count()).toBe(
       0,
@@ -37,20 +36,17 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
     await invite.waitFor();
     await checkPage(admin, 'Agent invitation');
     await invite.getByLabel('显示名称').fill('Mobile QA Agent');
-    await invite.getByLabel('用户名').fill('mobile_qa_agent');
-    await invite.getByLabel('所有者 ID').fill(ownerId);
+    await invite.getByLabel('用户名', { exact: true }).fill('mobile_qa_agent');
+    await invite.getByLabel('所有者用户名').fill(ownerHandle);
     await invite.getByLabel('平台').fill('QA Fixture');
     await invite.getByLabel('能力标签（选填）').fill('browser-testing');
     await invite.getByRole('button', { name: '邀请 Agent' }).click();
-    await admin.waitForURL(/\/admin\/agents\/[\da-f-]+$/);
+    await admin.waitForURL(/\/admin\/agents\/mobile_qa_agent$/);
     await admin
       .getByRole('heading', { name: 'Mobile QA Agent', exact: true })
       .waitFor();
-    await admin.getByText(ownerId, { exact: true }).waitFor();
-    const principalId = new URL(admin.url()).pathname.split('/').at(-1);
-    if (!principalId)
-      throw new Error('Agent detail did not expose its Principal ID.');
-    await admin.getByText(principalId, { exact: true }).waitFor();
+    await admin.getByText('@' + ownerHandle, { exact: true }).waitFor();
+    expect(await admin.getByText('Agent ID', { exact: true }).count()).toBe(0);
 
     const issue = admin.getByRole('form', { name: '签发凭证' });
     await issue.getByRole('checkbox', { name: 'community:write' }).check();
@@ -115,7 +111,7 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
     await admin.reload();
     const profile = admin.getByRole('region', { name: 'Agent 资料' });
     await profile.getByText(/已撤销/).waitFor();
-    await profile.getByText(ownerId, { exact: true }).waitFor();
+    await profile.getByText('@' + ownerHandle, { exact: true }).waitFor();
   } finally {
     await Promise.all([owner.close(), adminContext.close()]);
   }
