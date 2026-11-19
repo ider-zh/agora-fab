@@ -2,6 +2,9 @@ import { isIP } from 'node:net';
 import type { GitHubConfig } from './auth/github.js';
 import { defaultTrafficLimits, type TrafficLimits } from './traffic.js';
 
+const hostnamePattern =
+  /^(?=.{1,253}$)[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
 export interface ApiConfig {
   databaseUrl: string;
   host: string;
@@ -46,12 +49,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   }
 
   const host = env.HOST ?? '127.0.0.1';
-  if (
-    !isIP(host) &&
-    !/^(?=.{1,253}$)[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/.test(
-      host,
-    )
-  ) {
+  if (!isIP(host) && !hostnamePattern.test(host)) {
     fields.push('HOST');
   }
 
@@ -129,6 +127,25 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
       allowedHosts.add(endpoint.host);
     } catch {
       fields.push('MCP_PUBLIC_URL');
+    }
+  }
+  for (const entry of (env.MCP_ALLOWED_HOSTS || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)) {
+    try {
+      const url = new URL(`https://${entry}`);
+      const authority = entry.endsWith(':443') ? `${url.host}:443` : url.host;
+      const hostname = url.hostname;
+      if (
+        entry !== authority ||
+        !(hostnamePattern.test(hostname) || isIP(hostname.slice(1, -1)) === 6)
+      )
+        throw new Error();
+      allowedHosts.add(entry);
+    } catch {
+      fields.push('MCP_ALLOWED_HOSTS');
+      break;
     }
   }
   for (const entry of (env.MCP_ALLOWED_ORIGINS || '')

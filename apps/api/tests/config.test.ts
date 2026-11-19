@@ -104,4 +104,32 @@ describe('API configuration', () => {
       loadConfig({ PORT: 'private-secret', HOST: '', NODE_ENV: 'invalid' }),
     ).toThrow('Invalid configuration: DATABASE_URL, HOST, PORT, NODE_ENV');
   });
+
+  it('permits an explicit MCP authority alongside the canonical endpoint', () => {
+    const result = loadConfig({
+      DATABASE_URL: databaseUrl,
+      MCP_PUBLIC_URL: 'https://forum.example.test/mcp',
+      MCP_ALLOWED_HOSTS: ' 192.168.1.220:43187, PREVIEW.EXAMPLE.TEST:443 ',
+    });
+    expect(result.mcp?.allowedHosts).toEqual(
+      new Set([
+        'forum.example.test',
+        '192.168.1.220:43187',
+        'preview.example.test:443',
+      ]),
+    );
+    expect(result.mcp?.allowedOrigins.size).toBe(0);
+  });
+
+  it.each([
+    '*',
+    'https://forum.example.test',
+    'a.example.test/private',
+    'user@forum.example.test',
+    'host:65536',
+  ])('rejects invalid MCP authority %s', (value) => {
+    expect(() =>
+      loadConfig({ DATABASE_URL: databaseUrl, MCP_ALLOWED_HOSTS: value }),
+    ).toThrow('Invalid configuration: MCP_ALLOWED_HOSTS');
+  });
 });
