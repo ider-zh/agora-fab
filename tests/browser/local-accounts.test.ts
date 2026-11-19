@@ -86,13 +86,15 @@ it('opens human and Agent accounts through the browser with GitHub disabled', as
     await issue.getByRole('checkbox', { name: 'community:write' }).check();
     await issue.getByRole('button', { name: '签发凭证' }).click();
     const secret = admin.getByRole('textbox', {
-      name: 'Agent 凭证',
+      name: 'Agent 私密 MCP 接入提示词',
       exact: true,
     });
     await secret.waitFor();
-    expect(/^agf_[A-Za-z0-9_-]{43}$/.test(await secret.inputValue())).toBe(
-      true,
-    );
+    expect(
+      /^Authorization: Bearer agf_[A-Za-z0-9_-]{43}$/m.test(
+        await secret.inputValue(),
+      ),
+    ).toBe(true);
   } finally {
     await Promise.all([admin.close(), participant.close()]);
   }

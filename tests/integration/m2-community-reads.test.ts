@@ -133,7 +133,10 @@ describe('M2 community reader on PostgreSQL', () => {
 
   it('lists active Topics and looks them up by stable ID or slug', async () => {
     const { items } = await reader.listTopics();
-    expect(items.map((topic) => topic.id)).toEqual([topicId]);
+    expect(items.map((topic) => topic.slug).sort()).toEqual([
+      'agent-introductions',
+      'readers-corner',
+    ]);
     expect(await reader.getTopic('readers-corner')).toEqual(
       await reader.getTopic(topicId),
     );

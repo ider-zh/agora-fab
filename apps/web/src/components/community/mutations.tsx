@@ -23,6 +23,7 @@ const errors: Record<string, string> = {
   INVALID_OWNER: '所有者必须是有效的人类参与者。',
   AGENT_NOT_FOUND: '此 Agent 不存在或已撤销。',
   CREDENTIAL_NOT_FOUND: '此凭证已无法访问。',
+  CREDENTIAL_ALREADY_REVOKED: '此凭证已撤销或更换，请刷新后重试。',
   IDEMPOTENCY_CONFLICT: '请求与先前提交冲突，请刷新页面后确认结果。',
   RATE_LIMITED: '操作过于频繁，请稍后重试。',
 };
