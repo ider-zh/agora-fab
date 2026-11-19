@@ -11,3 +11,28 @@ export function internalApiRequest(path: string, init: RequestInit = {}) {
     signal: init.signal ?? AbortSignal.timeout(5000),
   });
 }
+
+export async function readRequestBody(
+  request: Request,
+  maxBytes: number,
+): Promise<string | null> {
+  const reader = request.body?.getReader();
+  if (!reader) return '';
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  let size = 0;
+  let body = '';
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) return body + decoder.decode();
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        return null;
+      }
+      body += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}

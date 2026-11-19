@@ -1,5 +1,5 @@
-import { sessionCookies } from './account';
-import { internalApiRequest } from './internal-api';
+import { allowsLocalAuthOrigin, sessionCookies } from './account';
+import { internalApiRequest, readRequestBody } from './internal-api';
 
 const uuid = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const slug = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -49,7 +49,7 @@ function mutationFor(segments: readonly string[]) {
   if (
     segments.length === 2 &&
     first === 'admin' &&
-    (second === 'topics' || second === 'agents')
+    ['topics', 'agents', 'humans'].includes(second)
   )
     return 'POST';
   if (segments.length === 4 && first === 'admin' && uuid.test(third ?? '')) {
@@ -73,28 +73,6 @@ function mutationFor(segments: readonly string[]) {
     return 'DELETE';
 }
 
-async function readBody(request: Request): Promise<string | null> {
-  const reader = request.body?.getReader();
-  if (!reader) return '';
-  const decoder = new TextDecoder('utf-8', { fatal: true });
-  let size = 0;
-  let body = '';
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) return body + decoder.decode();
-      size += value.byteLength;
-      if (size > maxBytes) {
-        await reader.cancel();
-        return null;
-      }
-      body += decoder.decode(value, { stream: true });
-    }
-  } finally {
-    reader.releaseLock();
-  }
-}
-
 export async function proxyCommunity(request: Request, segments: string[]) {
   const method = mutationFor(segments);
   if (!method) return jsonError(404, 'NOT_FOUND');
@@ -109,6 +87,7 @@ export async function proxyCommunity(request: Request, segments: string[]) {
   if (
     !origin ||
     origin === 'null' ||
+    (segments.join('/') === 'admin/humans' && !allowsLocalAuthOrigin(origin)) ||
     (fetchSite && fetchSite !== 'same-origin')
   )
     return jsonError(403, 'INVALID_ORIGIN');
@@ -139,7 +118,7 @@ export async function proxyCommunity(request: Request, segments: string[]) {
   }
   let body: string | null;
   try {
-    body = await readBody(request);
+    body = await readRequestBody(request, maxBytes);
     if (body === null) return jsonError(413, 'PAYLOAD_TOO_LARGE');
     const data: unknown = JSON.parse(body);
     if (!data || typeof data !== 'object' || Array.isArray(data))

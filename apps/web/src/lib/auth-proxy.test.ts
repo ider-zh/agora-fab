@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getAccount } from './account';
+import { canShowLocalAuth, getAccount } from './account';
 import { proxyAuth } from './auth-proxy';
 
 afterEach(() => {
@@ -8,6 +8,23 @@ afterEach(() => {
 });
 
 const origin = 'https://community.example.test';
+
+function localRequest(
+  operation: string,
+  body: URLSearchParams | string,
+  extraHeaders: Record<string, string> = {},
+) {
+  return new Request(`${origin}/api/auth/local/${operation}?ignored=1`, {
+    method: 'POST',
+    body,
+    headers: {
+      origin,
+      'content-type': 'application/x-www-form-urlencoded',
+      'sec-fetch-site': 'same-origin',
+      ...extraHeaders,
+    },
+  });
+}
 
 describe('browser auth proxy', () => {
   it('allows only known operations and their configured methods', async () => {
@@ -117,6 +134,106 @@ describe('browser auth proxy', () => {
   );
 });
 
+describe('local browser auth proxy', () => {
+  it.each(['login', 'activate'])(
+    'relays only the form fields for %s as JSON',
+    async (operation) => {
+      vi.stubEnv('AUTH_PUBLIC_ORIGIN', origin);
+      const fields = {
+        handle: 'participant',
+        password: '  fixture+été&password  ',
+        ...(operation === 'activate' ? { activationCode: 'c'.repeat(43) } : {}),
+      };
+      const cookie =
+        '__Host-agorafab_session=fixture; Secure; HttpOnly; Path=/';
+      const fetch = vi.fn().mockResolvedValue(
+        new Response(null, {
+          status: 303,
+          headers: { location: '/account', 'set-cookie': cookie },
+        }),
+      );
+      vi.stubGlobal('fetch', fetch);
+      const response = await proxyAuth(
+        localRequest(operation, new URLSearchParams(fields), {
+          authorization: 'Bearer ignored',
+        }),
+        ['local', operation],
+      );
+      const [url, init] = fetch.mock.calls[0]!;
+      expect(url.pathname).toBe(`/api/auth/local/${operation}`);
+      expect(url.search).toBe('');
+      expect(init.method).toBe('POST');
+      expect(Object.fromEntries(init.headers)).toEqual({
+        origin,
+        'content-type': 'application/json',
+      });
+      expect(JSON.parse(init.body)).toEqual(fields);
+      expect(response.headers.get('location')).toBe('/account');
+      expect(response.headers.getSetCookie()).toEqual([cookie]);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    },
+  );
+
+  it('rejects alternate origins and invalid forms before forwarding any credentials', async () => {
+    vi.stubEnv('AUTH_PUBLIC_ORIGIN', origin);
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const route = ['local', 'login'];
+    const body = 'handle=participant&password=fixture-password';
+    const blockedHeaders: Record<string, string>[] = [
+      { origin: 'https://alternate.example.test' },
+      { origin: 'http://192.168.1.220:3100' },
+      { 'sec-fetch-site': 'same-site' },
+    ];
+    for (const extra of blockedHeaders) {
+      expect(
+        (await proxyAuth(localRequest('login', body, extra), route)).status,
+      ).toBe(403);
+    }
+    for (const invalid of [
+      body + '&role=admin',
+      body + '&handle=duplicate',
+      body + 'a'.repeat(4096),
+    ]) {
+      const response = await proxyAuth(localRequest('login', invalid), route);
+      expect(response.headers.get('location')).toBe(
+        '/account?error=local-sign-in-failed',
+      );
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('maps provider rejection to fixed messages with no credential data', async () => {
+    vi.stubEnv('AUTH_PUBLIC_ORIGIN', origin);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('private', {
+          status: 429,
+          headers: { 'set-cookie': 'agorafab_session=ignored' },
+        }),
+      ),
+    );
+    const response = await proxyAuth(
+      localRequest(
+        'activate',
+        new URLSearchParams({
+          handle: 'participant',
+          password: 'fixture-password',
+          activationCode: 'c'.repeat(43),
+        }),
+      ),
+      ['local', 'activate'],
+    );
+    expect(response.headers.get('location')).toBe(
+      '/account?error=too-many-attempts',
+    );
+    expect(response.headers.getSetCookie()).toEqual([]);
+    expect(await response.text()).toBe('');
+  });
+});
+
 describe('account state', () => {
   it('checks whether sign-in is enabled after an expired session', async () => {
     const fetch = vi
@@ -127,9 +244,40 @@ describe('account state', () => {
     expect(await getAccount('agorafab_session=fixture')).toEqual({
       status: 'signed-out',
       githubEnabled: false,
+      localEnabled: false,
     });
     expect(fetch.mock.calls[0]?.[0].pathname).toBe('/api/me');
     expect(fetch.mock.calls[1]?.[0].pathname).toBe('/api/auth/config');
+  });
+
+  it('uses the configured local origin to expose the form only at the login address', async () => {
+    vi.stubEnv('AUTH_PUBLIC_ORIGIN', 'http://127.0.0.1:43187');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          githubEnabled: false,
+          localEnabled: true,
+        }),
+      ),
+    );
+    expect(await getAccount(null)).toEqual({
+      status: 'signed-out',
+      githubEnabled: false,
+      localEnabled: true,
+    });
+    expect(canShowLocalAuth(new Headers({ host: '192.168.1.220:3100' }))).toBe(
+      false,
+    );
+    expect(
+      canShowLocalAuth(
+        new Headers({
+          host: 'internal-web:3000',
+          'x-forwarded-host': '127.0.0.1:43187',
+          'x-forwarded-proto': 'http',
+        }),
+      ),
+    ).toBe(true);
   });
 
   it('returns only the account display fields for a verified human', async () => {

@@ -51,5 +51,10 @@ export function createTrafficPolicy(limits: TrafficLimits, now = Date.now) {
     authorize,
     checkSearch: (peer: string) =>
       consume([{ key: `search:${peer}`, cap: limits.searchesPerPeer }]),
+    checkLogin: (peer: string, handle: string) =>
+      consume([
+        { key: `signin-peer:${peer}`, cap: 30 },
+        { key: `signin-account:${handle}`, cap: 8 },
+      ]),
   };
 }

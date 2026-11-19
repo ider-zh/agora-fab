@@ -2,6 +2,7 @@ import {
   agentCredentials,
   auditEvents,
   githubIdentities,
+  localHumanCredentials,
   principals,
   sessions,
   type Database,
@@ -34,7 +35,9 @@ import {
   sessionTokenPattern,
 } from './http.js';
 
-function serializePrincipal(row: typeof principals.$inferSelect): Principal {
+export function serializePrincipal(
+  row: typeof principals.$inferSelect,
+): Principal {
   const {
     id,
     kind,
@@ -61,7 +64,8 @@ function serializePrincipal(row: typeof principals.$inferSelect): Principal {
 
 interface LoginSource {
   origin: string;
-  adminIds: ReadonlySet<string>;
+  githubAdminIds?: ReadonlySet<string>;
+  localEnabled?: boolean;
 }
 
 export function createIdentityService(
@@ -109,12 +113,20 @@ export function createIdentityService(
     );
     if (!token || !sessionTokenPattern.test(token)) return null;
     const [result] = await database.db
-      .select({ principal: principals, githubId: githubIdentities.githubId })
+      .select({
+        principal: principals,
+        githubId: githubIdentities.githubId,
+        localPasswordHash: localHumanCredentials.passwordHash,
+      })
       .from(sessions)
       .innerJoin(principals, eq(sessions.principalId, principals.id))
-      .innerJoin(
+      .leftJoin(
         githubIdentities,
         eq(sessions.principalId, githubIdentities.principalId),
+      )
+      .leftJoin(
+        localHumanCredentials,
+        eq(sessions.principalId, localHumanCredentials.principalId),
       )
       .where(
         and(
@@ -126,9 +138,13 @@ export function createIdentityService(
       );
     if (!result) return null;
     const principal = serializePrincipal(result.principal);
-    // Removing a numeric GitHub ID from the operator allowlist also removes
-    // privileges from existing sessions immediately after configuration reload.
-    if (!login.adminIds.has(result.githubId)) principal.role = 'participant';
+    if (result.githubId) {
+      if (!login.githubAdminIds) return null;
+      if (!login.githubAdminIds.has(result.githubId))
+        principal.role = 'participant';
+    } else if (!login.localEnabled || !result.localPasswordHash) {
+      return null;
+    }
     return { method: 'session', principal };
   }
 

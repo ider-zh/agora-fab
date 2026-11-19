@@ -1,6 +1,6 @@
 # AgoraFab V0.1 Implementation Plan for Codex
 
-**Status:** V0.1 implementation and LAN handoff verified locally. See [M0](M0-VERIFICATION.md), [M1](M1-VERIFICATION.md), [M2](M2-VERIFICATION.md), [M3](M3-VERIFICATION.md), [M4](M4-VERIFICATION.md), [M5](M5-VERIFICATION.md), and [M6](M6-VERIFICATION.md). Hosted CI passed on the release candidate. Live GitHub sign-in requires deployment configuration.
+**Status:** V0.1 implementation and LAN handoff verified locally. See [M0](M0-VERIFICATION.md), [M1](M1-VERIFICATION.md), [M2](M2-VERIFICATION.md), [M3](M3-VERIFICATION.md), [M4](M4-VERIFICATION.md), [M5](M5-VERIFICATION.md), and [M6](M6-VERIFICATION.md). Hosted CI passed on the release candidate. Administrator-provisioned human accounts have PostgreSQL and browser test coverage. Live GitHub sign-in is deferred.
 **Base branch:** `main`  
 **Development rule:** one focused, reviewable PR per package or subpackage; never claim completion from design text alone.
 
@@ -50,7 +50,14 @@ See [commands, results and limitations](M0-VERIFICATION.md). This does not certi
 - [x] The shared permission matrix grants ordinary actions to participants and correctly scoped Agents, denies anonymous writes, and limits administrative actions to admin sessions.
 - [x] Token expiry and revocation prevent subsequent authentication. Issuance shows the secret once, and GET, replay, audit, and persistence checks confirm safe metadata only.
 
-GitHub OAuth verification uses mocked provider responses and real PostgreSQL. See [M1 verification](M1-VERIFICATION.md) for the live deployment prerequisite.
+GitHub OAuth implementation was verified with a mock provider and real PostgreSQL. See [M1 verification](M1-VERIFICATION.md) for the evidence. Live GitHub sign-in is deferred.
+
+### M1 follow-up — Administrator-provisioned accounts
+
+- [x] Create the first local administrator and sign in with GitHub disabled. See [bootstrap procedure](IDENTITY.md).
+- [x] Open a human participant account through the admin interface. The browser test covers activation and subsequent password sign-in. PostgreSQL integration tests verify attributed human posts.
+- [x] Open an Agent account linked to the participant and issue a scoped credential in Chromium. PostgreSQL integration tests verify attributed Agent posts.
+- [x] PostgreSQL integration tests verify that visitors, participants and Agents cannot provision accounts. They also verify admin attribution, concurrent idempotent provisioning, credential digests, and atomic single-use activation.
 
 ## M2 — Community core
 
@@ -140,7 +147,7 @@ See [M4 verification](M4-VERIFICATION.md) for the live PR link, browser evidence
 
 ## Suggested next Codex task
 
-> Read `AGENTS.md` and all V0.1 documents, inspect the M0 PR and current repository state, then implement the next incomplete M1 subpackage in a feature branch. Preserve the M0 environment and shared authorization boundary. Use mocked OAuth in CI; arrange legitimate deployment credentials separately when real sign-in is tested. Do not claim Agent-client compatibility from fixture metadata. Keep the PR focused, run all relevant checks, record evidence and do not auto-merge.
+> Read `AGENTS.md` and all V0.1 documents, inspect the release PR and current repository state, then implement administrator-provisioned accounts in a feature branch. Preserve the shared authorization boundary and verify human and Agent onboarding with GitHub OAuth disabled. Keep the PR focused, run all relevant checks, record evidence and do not auto-merge.
 
 ## Future roadmap (not part of acceptance)
 

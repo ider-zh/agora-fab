@@ -168,6 +168,18 @@ h1 {
   color: var(--green);
   background: #fff;
 }
+.account-local-form.community-form {
+  margin-top: 16px;
+  padding: 0;
+  border: 0;
+}
+.account-activation {
+  margin-top: 22px;
+}
+.account-activation summary {
+  color: var(--green);
+  cursor: pointer;
+}
 .status-panel {
   display: flex;
   align-items: center;

@@ -14,6 +14,28 @@ export function sessionCookies(header: string | null) {
   return selectCookies(header, sessionNames);
 }
 
+export function allowsLocalAuthOrigin(origin: string | null) {
+  const configured = process.env.AUTH_PUBLIC_ORIGIN;
+  if (!origin || (configured && origin !== configured)) return false;
+  try {
+    const url = new URL(origin);
+    return (
+      url.origin === origin &&
+      (url.protocol === 'https:' ||
+        (url.protocol === 'http:' &&
+          ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)))
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function canShowLocalAuth(headers: Headers) {
+  const protocol = headers.get('x-forwarded-proto') ?? 'http';
+  const host = headers.get('x-forwarded-host') ?? headers.get('host');
+  return allowsLocalAuthOrigin(`${protocol}://${host ?? ''}`);
+}
+
 interface HumanProfile {
   id: string;
   displayName: string;
@@ -23,8 +45,13 @@ interface HumanProfile {
 
 type Account =
   | { status: 'signed-in'; profile: HumanProfile }
-  | { status: 'signed-out'; githubEnabled: boolean }
+  | ({ status: 'signed-out' } & LoginModes)
   | { status: 'unavailable' };
+
+interface LoginModes {
+  githubEnabled: boolean;
+  localEnabled: boolean;
+}
 
 function humanProfile(data: unknown): HumanProfile | undefined {
   if (
@@ -54,6 +81,27 @@ function humanProfile(data: unknown): HumanProfile | undefined {
   }
 }
 
+export async function getLoginModes(): Promise<LoginModes | undefined> {
+  try {
+    const response = await internalApiRequest('/api/auth/config');
+    if (!response.ok) return;
+    const data: unknown = await response.json();
+    if (
+      typeof data === 'object' &&
+      data !== null &&
+      'githubEnabled' in data &&
+      typeof data.githubEnabled === 'boolean'
+    ) {
+      return {
+        githubEnabled: data.githubEnabled,
+        localEnabled: 'localEnabled' in data && data.localEnabled === true,
+      };
+    }
+  } catch {
+    // If configuration cannot be checked, hide unavailable login methods.
+  }
+}
+
 export async function getAccount(
   cookieHeader: string | null,
 ): Promise<Account> {
@@ -71,17 +119,8 @@ export async function getAccount(
       }
       if (response.status !== 401) return { status: 'unavailable' };
     }
-    const response = await internalApiRequest('/api/auth/config');
-    if (!response.ok) return { status: 'unavailable' };
-    const data: unknown = await response.json();
-    if (
-      typeof data === 'object' &&
-      data !== null &&
-      'githubEnabled' in data &&
-      typeof data.githubEnabled === 'boolean'
-    ) {
-      return { status: 'signed-out', githubEnabled: data.githubEnabled };
-    }
+    const modes = await getLoginModes();
+    if (modes) return { status: 'signed-out', ...modes };
   } catch {
     // Return a fixed status. Exceptions may contain connection details.
   }

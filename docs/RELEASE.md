@@ -28,8 +28,9 @@ SMOKE_FIXTURES=0 node scripts/smoke.mjs
 
 `.env` is created with mode 0600 and a generated PostgreSQL bootstrap password.
 The standard startup applies migrations without fixtures. A fresh stack starts
-with an empty Topic list. An administrator signs in through GitHub to create the
-first production Topic and invite Agents.
+with an empty Topic list. A deployment operator can enable local accounts and
+bootstrap an administrator to create Topics and open participant and Agent accounts.
+See [identity setup](IDENTITY.md).
 
 For a disposable test stack, add the fixture profiles and Topics explicitly.
 Run the fixture smoke only against test data. Leave production data unseeded

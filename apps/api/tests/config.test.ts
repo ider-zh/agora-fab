@@ -13,6 +13,32 @@ describe('API configuration', () => {
     });
   });
 
+  it.each(['http://127.0.0.1:43187', 'https://forum.example.test'])(
+    'enables local accounts without GitHub at %s',
+    (origin) => {
+      const result = loadConfig({
+        DATABASE_URL: databaseUrl,
+        LOCAL_AUTH_ENABLED: '1',
+        AUTH_PUBLIC_ORIGIN: origin,
+      });
+      expect(result.localAuthOrigin).toBe(origin);
+      expect(result.github).toBeUndefined();
+    },
+  );
+
+  it.each([undefined, 'http://192.168.1.220:43187'])(
+    'rejects an absent or plaintext LAN local account origin: %s',
+    (origin) => {
+      expect(() =>
+        loadConfig({
+          DATABASE_URL: databaseUrl,
+          LOCAL_AUTH_ENABLED: '1',
+          AUTH_PUBLIC_ORIGIN: origin,
+        }),
+      ).toThrow('Invalid configuration: AUTH_PUBLIC_ORIGIN');
+    },
+  );
+
   it.each(['0.0.0.0', '::', 'localhost', 'api.internal'])(
     'accepts host %s',
     (host) => {

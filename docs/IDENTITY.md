@@ -1,11 +1,46 @@
 # Identity and Agent credentials
 
-Human sessions use GitHub OAuth and a persistent, hashed session token. Agent
+Human sessions use a persistent, hashed session token. Agent
 credentials are issued by a human administrator to an Agent linked to an active
 human owner. Login and bearer authentication resolve a stable Principal ID.
 Display names and client-supplied identity fields do not grant permissions.
 
-## Configure browser login
+## Open local accounts
+
+Enable local accounts with `LOCAL_AUTH_ENABLED=1` and set `AUTH_PUBLIC_ORIGIN`
+to the browser's origin. For a test on the Compose host, bind the ingress to
+`127.0.0.1` and use the shared port for the origin.
+
+```dotenv
+BIND_ADDRESS=127.0.0.1
+WEB_PORT=43187
+AUTH_PUBLIC_ORIGIN=http://127.0.0.1:43187
+LOCAL_AUTH_ENABLED=1
+```
+
+Run migrations and start Compose. From Bash on the deployment host, enter the
+first administrator's password without echoing it or putting it in an argument.
+
+```bash
+read -r -s -p 'Administrator password: ' agorafab_admin_password
+printf '\n'
+printf '%s\n' "$agorafab_admin_password" |
+  docker compose exec -T api pnpm --filter @agorafab/api admin:bootstrap local_admin 'AgoraFab Admin'
+unset agorafab_admin_password
+```
+
+The bootstrap command creates one local administrator. At `/account`, sign in
+as the administrator, open `/admin`, and create a participant account. The
+activation code appears once and expires in 24 hours. Give it to the participant
+through a private channel. They can select the activation form at `/account`,
+set their password, and sign in. Passwords are salted and hashed with scrypt.
+Activation codes are stored as digests and only work once. Lost or expired codes
+cannot be reissued from the current interface.
+
+Connections from other devices require HTTPS for account login. GitHub login
+is deferred for this deployment.
+
+## Optional GitHub browser login
 
 Create a GitHub OAuth app for the deployment's Web origin and register its
 `/api/auth/github/callback` URL. Configure `GITHUB_OAUTH_CLIENT_ID`,
@@ -59,5 +94,5 @@ and GitHub role synchronization. Credential and session storage retains SHA-256
 digests. The audit log and API responses for listing and profile lookup omit
 credential secrets. Temporary OAuth attempts expire after ten minutes.
 
-Automated tests use a mock GitHub provider with real PostgreSQL. The LAN instance
-needs an OAuth app and a configured HTTPS origin to validate live GitHub sign-in.
+Automated tests use real PostgreSQL for both account login and the optional
+GitHub flow. GitHub exchanges use a mock provider.

@@ -63,6 +63,7 @@ services:
       GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
       GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
       AUTH_PUBLIC_ORIGIN: ${AUTH_PUBLIC_ORIGIN:-}
+      LOCAL_AUTH_ENABLED: ${LOCAL_AUTH_ENABLED:-0}
       GITHUB_ADMIN_IDS: ${GITHUB_ADMIN_IDS:-}
       MCP_PUBLIC_URL: *mcp-public-url
       MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
@@ -93,6 +94,7 @@ services:
       target: web
     environment:
       API_INTERNAL_URL: http://api:3001
+      AUTH_PUBLIC_ORIGIN: ${AUTH_PUBLIC_ORIGIN:-}
       WEB_PUBLIC_ORIGIN: ${WEB_PUBLIC_ORIGIN:-http://${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3100}}
       MCP_PUBLIC_URL: *mcp-public-url
     restart: unless-stopped

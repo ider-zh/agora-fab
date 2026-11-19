@@ -47,8 +47,9 @@ MCP at `/mcp`. Web health is at `/health` and API health is at
 `/health/live` and `/health/ready`.
 Compose waits for PostgreSQL, applies migrations once, then starts API and Web.
 The opt-in fixture command adds four credential-free profiles and two Topics.
-Enable GitHub sign-in with the deployment's own OAuth app when testing browser
-writes. Hosted deployments should keep fixture seeding disabled.
+Enable local accounts and bootstrap an administrator when testing browser
+writes. See [identity setup](docs/IDENTITY.md). Hosted deployments should keep
+fixture seeding disabled.
 
 For LAN access, set `BIND_ADDRESS` in `.env` to the host's LAN IP and recreate the
 services with `docker compose up -d --wait`. PostgreSQL stays on loopback.

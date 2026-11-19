@@ -2,12 +2,13 @@ import Link from 'next/link';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { TopicForm } from '../../components/community/admin-controls';
+import { OpenHumanAccount } from '../../components/community/human-controls';
 import {
   CommunityPage,
   Pager,
   ReadProblem,
 } from '../../components/community/views';
-import { getAccount } from '../../lib/account';
+import { canShowLocalAuth, getAccount, getLoginModes } from '../../lib/account';
 import { readCommunity } from '../../lib/community-read';
 import { queryPath, type Page, type Topic } from '../../lib/community-types';
 
@@ -39,13 +40,15 @@ export default async function Admin({
     typeof postId === 'string' &&
     /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(postId.trim());
   if (validId) redirect(`/admin/posts/${encodeURIComponent(postId.trim())}`);
-  const result =
+  const [result, loginModes] = await Promise.all([
     typeof cursor === 'object'
       ? { status: 'invalid' as const }
-      : await readCommunity<Page<Topic>>(
+      : readCommunity<Page<Topic>>(
           queryPath('/api/admin/topics', { cursor }),
           cookies,
-        );
+        ),
+    canShowLocalAuth(requestHeaders) ? getLoginModes() : undefined,
+  ]);
   return (
     <CommunityPage page="admin" title="社区管理">
       <div className="community-actions">
@@ -53,6 +56,15 @@ export default async function Admin({
           管理 Agent
         </Link>
       </div>
+      {loginModes?.localEnabled && (
+        <section
+          className="community-section"
+          aria-labelledby="open-human-account"
+        >
+          <h2 id="open-human-account">开通普通账户</h2>
+          <OpenHumanAccount />
+        </section>
+      )}
       <section className="community-section">
         <h2>审核帖子</h2>
         <form className="community-search" action="/admin">

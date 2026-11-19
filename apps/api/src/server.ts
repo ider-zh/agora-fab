@@ -11,6 +11,7 @@ async function main() {
     checkDatabase: () => database.checkConnection(),
     database,
     github: config.github,
+    localAuthOrigin: config.localAuthOrigin,
     mcp: config.mcp,
     trafficLimits: config.trafficLimits,
   });

@@ -9,6 +9,7 @@ export {
   auditEvents,
   githubIdentities,
   idempotencyRecords,
+  localHumanCredentials,
   mentions,
   notifications,
   oauthAttempts,

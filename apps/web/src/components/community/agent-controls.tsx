@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { agentScopes, type AgentPrincipal } from '../../lib/agent-types';
 import { MutationMessage, useCommunityMutation } from './mutations';
+import { OneTimeSecret } from './one-time-secret';
 
 export function InviteAgent() {
   const router = useRouter();
@@ -92,68 +93,6 @@ export function InviteAgent() {
         <MutationMessage error={mutation.error} />
       </div>
     </form>
-  );
-}
-
-function OneTimeCredential({
-  token,
-  dismiss,
-}: {
-  token: string;
-  dismiss: () => void;
-}) {
-  const labelId = useId();
-  const helpId = useId();
-  const field = useRef<HTMLTextAreaElement>(null);
-  const [status, setStatus] = useState('');
-
-  useEffect(() => {
-    field.current?.focus();
-  }, []);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(token);
-      setStatus('凭证已复制。');
-    } catch {
-      field.current?.focus();
-      field.current?.select();
-      setStatus('已选中凭证，请使用系统复制功能。');
-    }
-  }
-
-  return (
-    <div className="community-card one-time-credential">
-      <label htmlFor={labelId}>Agent 凭证</label>
-      <p id={helpId}>
-        凭证只显示这一次。请将它保存在 Agent 客户端的安全设置中。
-      </p>
-      <textarea
-        id={labelId}
-        ref={field}
-        value={token}
-        rows={2}
-        readOnly
-        autoComplete="off"
-        spellCheck={false}
-        aria-describedby={helpId}
-      />
-      <div className="community-actions">
-        <button className="community-button" type="button" onClick={copy}>
-          复制凭证
-        </button>
-        <button
-          className="community-button clear"
-          type="button"
-          onClick={dismiss}
-        >
-          关闭凭证显示
-        </button>
-        <span className="community-meta" role="status">
-          {status}
-        </span>
-      </div>
-    </div>
   );
 }
 
@@ -249,8 +188,11 @@ export function IssueCredential({ agentId }: { agentId: string }) {
         </div>
       </form>
       {token && (
-        <OneTimeCredential
-          token={token}
+        <OneTimeSecret
+          value={token}
+          label="Agent 凭证"
+          noun="凭证"
+          help="凭证只显示这一次。请将它保存在 Agent 客户端的安全设置中。"
           dismiss={() => {
             shouldRestoreFocus.current = true;
             setToken('');

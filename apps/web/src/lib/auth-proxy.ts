@@ -1,5 +1,9 @@
-import { selectCookies, sessionCookies } from './account';
-import { internalApiRequest } from './internal-api';
+import {
+  allowsLocalAuthOrigin,
+  selectCookies,
+  sessionCookies,
+} from './account';
+import { internalApiRequest, readRequestBody } from './internal-api';
 
 const responseHeaders = {
   'Cache-Control': 'no-store',
@@ -9,8 +13,43 @@ const responseHeaders = {
 const operations = {
   'github/start': 'POST',
   'github/callback': 'GET',
+  'local/login': 'POST',
+  'local/activate': 'POST',
   logout: 'POST',
 } as const;
+
+function failure(error: string) {
+  return new Response(null, {
+    status: 303,
+    headers: { ...responseHeaders, Location: `/account?error=${error}` },
+  });
+}
+
+const localFormLimit = 4096;
+
+async function localForm(request: Request, activate: boolean) {
+  if (
+    request.headers
+      .get('content-type')
+      ?.split(';', 1)[0]
+      ?.trim()
+      .toLowerCase() !== 'application/x-www-form-urlencoded' ||
+    Number(request.headers.get('content-length')) > localFormLimit
+  )
+    return;
+  const body = await readRequestBody(request, localFormLimit);
+  if (body === null) return;
+  const form = new URLSearchParams(body);
+  const fields = activate
+    ? ['handle', 'password', 'activationCode']
+    : ['handle', 'password'];
+  if (
+    form.size !== fields.length ||
+    fields.some((key) => form.getAll(key).length !== 1)
+  )
+    return;
+  return JSON.stringify(Object.fromEntries(form));
+}
 
 function redirectFor(operation: keyof typeof operations, location: string) {
   if (operation === 'github/start') {
@@ -51,6 +90,15 @@ export async function proxyAuth(request: Request, segments: string[]) {
 
   const headers = new Headers();
   const origin = request.headers.get('origin');
+  const local = route === 'local/login' || route === 'local/activate';
+  const fetchSite = request.headers.get('sec-fetch-site');
+  if (
+    local &&
+    (!allowsLocalAuthOrigin(origin) ||
+      (fetchSite && fetchSite !== 'same-origin'))
+  ) {
+    return new Response(null, { status: 403, headers: responseHeaders });
+  }
   if (origin) headers.set('origin', origin);
   const incomingCookies = request.headers.get('cookie');
   const cookie = [
@@ -61,11 +109,25 @@ export async function proxyAuth(request: Request, segments: string[]) {
     .join('; ');
   if (cookie) headers.set('cookie', cookie);
   const query = route === 'github/callback' ? new URL(request.url).search : '';
+  const rejection = {
+    'github/start': 'sign-in-failed',
+    'github/callback': 'sign-in-failed',
+    'local/login': 'local-sign-in-failed',
+    'local/activate': 'activation-failed',
+    logout: 'sign-out-failed',
+  }[route];
 
   try {
+    let body: string | undefined;
+    if (local) {
+      body = await localForm(request, route === 'local/activate');
+      if (!body) return failure(rejection);
+      headers.set('content-type', 'application/json');
+    }
     const upstream = await internalApiRequest(`/api/auth/${route}${query}`, {
       method,
       headers,
+      body,
       signal: AbortSignal.timeout(15000),
     });
     const location = upstream.headers.get('location');
@@ -83,17 +145,12 @@ export async function proxyAuth(request: Request, segments: string[]) {
       return response;
     }
     if (upstream.status >= 400 && upstream.status < 500) {
-      const error = route === 'logout' ? 'sign-out-failed' : 'sign-in-failed';
-      return new Response(null, {
-        status: 303,
-        headers: { ...responseHeaders, Location: `/account?error=${error}` },
-      });
+      return failure(
+        local && upstream.status === 429 ? 'too-many-attempts' : rejection,
+      );
     }
   } catch {
     // Do not expose provider or internal API error details to the browser.
   }
-  return new Response(null, {
-    status: 303,
-    headers: { ...responseHeaders, Location: '/account?error=unavailable' },
-  });
+  return failure('unavailable');
 }

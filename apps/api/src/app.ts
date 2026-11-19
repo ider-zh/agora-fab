@@ -8,6 +8,7 @@ import {
   type GitHubProvider,
 } from './auth/github.js';
 import { createIdentityService } from './auth/identity.js';
+import { registerLocalAuthRoutes } from './auth/local.js';
 import { registerIdentityRoutes } from './auth/routes.js';
 import { registerCommunityRoutes } from './community/routes.js';
 import { createMcpActions } from './mcp/actions.js';
@@ -33,6 +34,7 @@ export interface BuildAppOptions {
   database?: Database;
   github?: GitHubConfig;
   githubProvider?: GitHubProvider;
+  localAuthOrigin?: string;
   trafficLimits?: Partial<TrafficLimits>;
   clock?: () => number;
   mcp?: {
@@ -151,6 +153,11 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
       { ...defaultTrafficLimits, ...options.trafficLimits },
       options.clock,
     );
+    const origin = options.localAuthOrigin ?? options.github?.origin;
+    app.get('/api/auth/config', async () => ({
+      githubEnabled: !!options.github,
+      ...(options.localAuthOrigin ? { localEnabled: true } : {}),
+    }));
     registerGitHubRoutes(app, {
       database: options.database,
       config: options.github,
@@ -158,10 +165,24 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
     });
     const identity = createIdentityService(
       database,
-      options.github,
+      origin
+        ? {
+            origin,
+            githubAdminIds: options.github?.adminIds,
+            localEnabled: !!options.localAuthOrigin,
+          }
+        : undefined,
       traffic.authorize,
     );
-    registerIdentityRoutes(app, identity, options.github?.origin);
+    registerIdentityRoutes(app, identity, origin);
+    if (options.localAuthOrigin)
+      registerLocalAuthRoutes(
+        app,
+        database,
+        identity,
+        traffic,
+        options.localAuthOrigin,
+      );
     registerCommunityRoutes(app, database, identity, traffic);
     const tasks = createTaskService(database, traffic.authorize);
     registerProjectRoutes(app, database, identity, tasks, traffic.authorize);

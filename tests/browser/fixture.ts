@@ -8,6 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium, type Browser, type Page } from 'playwright';
 import { buildApp } from '../../apps/api/src/app.js';
+import { bootstrapLocalAdmin } from '../../apps/api/src/auth/local.js';
 import { createDatabase } from '../../packages/db/src/index.js';
 import { migrateDatabase } from '../../packages/db/src/migrations.js';
 import { seedFixtures } from '../../packages/db/src/seed.js';
@@ -79,7 +80,11 @@ async function stopChild(child: ChildProcess | undefined) {
   }
 }
 
-export async function browserFixture() {
+export async function browserFixture(localAdmin?: {
+  handle: string;
+  displayName: string;
+  password: string;
+}) {
   const url = process.env.TEST_DATABASE_URL;
   if (!url) throw new Error('TEST_DATABASE_URL is required for browser tests.');
   const webDir = fileURLToPath(new URL('../../apps/web/', import.meta.url));
@@ -96,12 +101,15 @@ export async function browserFixture() {
     database,
     checkDatabase: database.checkConnection,
     logger: false,
-    github: {
-      origin,
-      clientId: 'browser-fixture',
-      clientSecret: 'browser-fixture',
-      adminIds: new Set([browserActors.admin.id]),
-    },
+    localAuthOrigin: localAdmin ? origin : undefined,
+    github: localAdmin
+      ? undefined
+      : {
+          origin,
+          clientId: 'browser-fixture',
+          clientSecret: 'browser-fixture',
+          adminIds: new Set([browserActors.admin.id]),
+        },
     githubProvider: {
       async exchange({ code }) {
         const actor = Object.values(browserActors).find(
@@ -129,6 +137,7 @@ export async function browserFixture() {
     await control.pool.query(`create schema "${schema}"`);
     await migrateDatabase(database, { migrationsSchema: schema });
     await seedFixtures(database, { SEED_MODE: 'fixture', NODE_ENV: 'test' });
+    if (localAdmin) await bootstrapLocalAdmin(database, localAdmin);
     const apiOrigin = await app.listen({ host: '127.0.0.1', port: 0 });
     next = spawn(
       process.execPath,
@@ -147,6 +156,7 @@ export async function browserFixture() {
           NODE_ENV: 'production',
           NEXT_TELEMETRY_DISABLED: '1',
           API_INTERNAL_URL: apiOrigin,
+          AUTH_PUBLIC_ORIGIN: origin,
         },
         stdio: 'ignore',
       },

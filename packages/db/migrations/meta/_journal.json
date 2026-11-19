@@ -29,6 +29,13 @@
       "when": 1794991284953,
       "tag": "0003_m4_projects",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795064379665,
+      "tag": "0004_m1_local_human_accounts",
+      "breakpoints": true
     }
   ]
 }

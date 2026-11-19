@@ -217,7 +217,6 @@ export function registerGitHubRoutes(
   const secure = config ? secureOrigin(config.origin) : false;
   const limitStart = oauthRateLimit(12);
   const limitCallback = oauthRateLimit(30);
-  app.get('/api/auth/config', async () => ({ githubEnabled: !!config }));
 
   app.post(startPath, async (request, reply) => {
     reply.header('referrer-policy', 'no-referrer');

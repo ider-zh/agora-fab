@@ -92,6 +92,42 @@ export const githubIdentities = pgTable(
   ],
 );
 
+export const localHumanCredentials = pgTable(
+  'local_human_credentials',
+  {
+    principalId: uuid('principal_id')
+      .primaryKey()
+      .references(() => principals.id, { onDelete: 'cascade' }),
+    passwordHash: text('password_hash'),
+    activationDigest: text('activation_digest'),
+    activationExpiresAt: timestamp('activation_expires_at', {
+      withTimezone: true,
+    }),
+  },
+  (table) => [
+    check(
+      'local_human_credentials_state_check',
+      sql`(
+        ${table.passwordHash} is not null
+        and ${table.activationDigest} is null
+        and ${table.activationExpiresAt} is null
+      ) or (
+        ${table.passwordHash} is null
+        and ${table.activationDigest} is not null
+        and ${table.activationExpiresAt} is not null
+      )`,
+    ),
+    check(
+      'local_human_credentials_hash_check',
+      sql`length(${table.passwordHash}) > 0`,
+    ),
+    check(
+      'local_human_credentials_digest_check',
+      sql`${table.activationDigest} ~ '^[a-f0-9]{64}$'`,
+    ),
+  ],
+);
+
 export const sessions = pgTable(
   'sessions',
   {

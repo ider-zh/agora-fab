@@ -8,6 +8,7 @@ export interface ApiConfig {
   port: number;
   nodeEnv: 'development' | 'test' | 'production';
   github?: GitHubConfig;
+  localAuthOrigin?: string;
   trafficLimits?: TrafficLimits;
   mcp?: {
     allowedHosts: ReadonlySet<string>;
@@ -72,6 +73,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   const clientId = env.GITHUB_OAUTH_CLIENT_ID || undefined;
   const clientSecret = env.GITHUB_OAUTH_CLIENT_SECRET || undefined;
   const origin = env.AUTH_PUBLIC_ORIGIN || undefined;
+  const localAuth = env.LOCAL_AUTH_ENABLED || '0';
+  if (localAuth !== '0' && localAuth !== '1') fields.push('LOCAL_AUTH_ENABLED');
   const adminIds = new Set(
     (env.GITHUB_ADMIN_IDS || '')
       .split(',')
@@ -80,11 +83,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   );
   if ([...adminIds].some((id) => !/^[1-9][0-9]{0,15}$/.test(id)))
     fields.push('GITHUB_ADMIN_IDS');
-  if (clientId || clientSecret || origin || adminIds.size) {
+  const githubRequested = !!(
+    clientId ||
+    clientSecret ||
+    adminIds.size ||
+    (origin && localAuth !== '1')
+  );
+  if (githubRequested) {
     if (!clientId || !/^[A-Za-z0-9_]{1,128}$/.test(clientId))
       fields.push('GITHUB_OAUTH_CLIENT_ID');
     if (!clientSecret || !/^[A-Za-z0-9_]{1,512}$/.test(clientSecret))
       fields.push('GITHUB_OAUTH_CLIENT_SECRET');
+  }
+  if (githubRequested || localAuth === '1') {
     try {
       const url = new URL(origin ?? '');
       if (
@@ -170,5 +181,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
     ...(clientId && clientSecret && origin
       ? { github: { clientId, clientSecret, origin, adminIds } }
       : {}),
+    ...(localAuth === '1' && origin ? { localAuthOrigin: origin } : {}),
   };
 }

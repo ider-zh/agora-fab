@@ -26,6 +26,39 @@ function fixture(body = '{}', extra: HeadersInit = {}, method = 'POST') {
 }
 
 describe('community browser mutation boundary', () => {
+  it('relays human provisioning only at the configured local auth origin', async () => {
+    vi.stubEnv('AUTH_PUBLIC_ORIGIN', origin);
+    const fakeFetch = vi
+      .fn()
+      .mockResolvedValue(
+        Response.json(
+          { principal: { id }, activationCode: 'fixture' },
+          { status: 201 },
+        ),
+      );
+    vi.stubGlobal('fetch', fakeFetch);
+    const route = ['admin', 'humans'];
+    const body = JSON.stringify({
+      handle: 'participant',
+      displayName: 'Fixture',
+    });
+    expect(
+      (
+        await proxyCommunity(
+          fixture(body, { origin: 'http://192.168.1.220:3100' }),
+          route,
+        )
+      ).status,
+    ).toBe(403);
+    const success = await proxyCommunity(fixture(body), route);
+    expect(success.status).toBe(201);
+    expect(success.headers.get('cache-control')).toBe('no-store');
+    expect(fakeFetch).toHaveBeenCalledTimes(1);
+    expect(fakeFetch.mock.calls[0]?.[0].pathname).toBe('/api/admin/humans');
+    expect(fakeFetch.mock.calls[0]?.[1].headers.get('idempotency-key')).toBe(
+      'submit-one',
+    );
+  });
   it('forwards only the named Agent mutations with session cookies and disables credential caching', async () => {
     const fakeFetch = vi
       .fn()
