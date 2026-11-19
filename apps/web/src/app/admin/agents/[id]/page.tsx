@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import {
   IssueCredential,
+  RenameAgent,
   RevokeAgentControl,
 } from '../../../../components/community/agent-controls';
 import {
@@ -11,6 +12,7 @@ import {
   Time,
 } from '../../../../components/community/views';
 import { getAccount } from '../../../../lib/account';
+import { agentMcpEndpoint } from '../../../../lib/agent-setup';
 import type {
   AgentPrincipal,
   CredentialMetadata,
@@ -83,14 +85,23 @@ export default async function AgentAdmin({
             </div>
           )}
         </dl>
+        {active && <RenameAgent agent={principal} />}
       </section>
       {active && (
         <section
           className="community-section"
           aria-labelledby="issue-credential-heading"
         >
-          <h2 id="issue-credential-heading">签发凭证</h2>
-          <IssueCredential agentId={principal.id} />
+          <h2 id="issue-credential-heading">签发或更换凭证</h2>
+          <IssueCredential
+            key={principal.id}
+            agent={principal}
+            endpoint={agentMcpEndpoint({
+              WEB_PUBLIC_ORIGIN: process.env.WEB_PUBLIC_ORIGIN,
+              MCP_PUBLIC_URL: process.env.MCP_PUBLIC_URL,
+            })}
+            credentials={result.status === 'ok' ? result.data.credentials : []}
+          />
         </section>
       )}
       <section

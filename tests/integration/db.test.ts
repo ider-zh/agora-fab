@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import journal from '../../packages/db/migrations/meta/_journal.json';
 import { createDatabase, type Database } from '../../packages/db/src/index.js';
@@ -15,6 +16,8 @@ if (!testDatabaseUrl) {
 const schemaName = `agorafab_test_${randomUUID().replaceAll('-', '')}`;
 let control: Database | undefined;
 let database: Database;
+let migratedTopics: unknown[];
+let migratedPrincipals: unknown[];
 
 describe('PostgreSQL migration and fixtures', () => {
   beforeAll(async () => {
@@ -25,9 +28,30 @@ describe('PostgreSQL migration and fixtures', () => {
     database = createDatabase(isolatedUrl.toString());
     await migrateDatabase(database, { migrationsSchema: schemaName });
     await migrateDatabase(database, { migrationsSchema: schemaName });
+    migratedTopics = (
+      await database.pool.query(
+        'select slug, title, kind, status, created_by from topics',
+      )
+    ).rows;
+    migratedPrincipals = (
+      await database.pool.query('select id from principals')
+    ).rows;
     await seedFixtures(database, { SEED_MODE: 'fixture', NODE_ENV: 'test' });
     await seedFixtures(database, { SEED_MODE: 'fixture', NODE_ENV: 'test' });
   }, 30_000);
+
+  it('provisions the introductions Topic without fixture profiles or Topics', async () => {
+    expect(migratedTopics).toEqual([
+      {
+        slug: 'agent-introductions',
+        title: '新人报道区',
+        kind: 'community',
+        status: 'active',
+        created_by: null,
+      },
+    ]);
+    expect(migratedPrincipals).toHaveLength(0);
+  });
 
   afterAll(async () => {
     if (database) await database.close();
@@ -67,7 +91,7 @@ describe('PostgreSQL migration and fixtures', () => {
     const workspaces = await database.pool.query(
       'select * from topics order by id',
     );
-    expect(workspaces.rows).toHaveLength(2);
+    expect(workspaces.rows).toHaveLength(3);
     expect(workspaces.rows[0]).toMatchObject({
       slug: 'daily-inspiration',
       kind: 'community',
@@ -83,7 +107,51 @@ describe('PostgreSQL migration and fixtures', () => {
     expect(migrations.rows[0].count).toBe(journal.entries.length);
   });
 
+  it('upgrades an existing database while preserving a Topic using the preferred slug', async () => {
+    const client = await control!.pool.connect();
+    try {
+      await client.query('begin');
+      await client.query('create schema "' + schemaName + '_upgrade"');
+      await client.query(
+        'set local search_path to "' + schemaName + '_upgrade"',
+      );
+      const migrationSql = (tag: string) =>
+        readFile(
+          new URL(`../../packages/db/migrations/${tag}.sql`, import.meta.url),
+          'utf8',
+        );
+      for (const entry of journal.entries.slice(0, 5)) {
+        await client.query(await migrationSql(entry.tag));
+      }
+      const owner = await client.query(
+        "insert into principals (kind, handle, display_name, role) values ('human', 'existing_admin', 'Admin', 'admin') returning id",
+      );
+      const original = await client.query(
+        "insert into topics (slug, kind, title, status, created_by) values ('agent-introductions', 'community', 'Local Topic', 'archived', $1) returning *",
+        [owner.rows[0].id],
+      );
+      await client.query(await migrationSql('0005_agent_introductions'));
+      const { rows } = await client.query('select * from topics order by slug');
+      expect(rows).toEqual([
+        original.rows[0],
+        expect.objectContaining({
+          slug: 'agent-introductions-1',
+          title: '新人报道区',
+          status: 'active',
+        }),
+      ]);
+    } finally {
+      await client.query('rollback');
+      client.release();
+    }
+  });
+
   it('enforces stable identity, normalized unique handles and human-only admins', async () => {
+    await expect(
+      database.pool.query(
+        "insert into topics (slug, kind, title) values ('missing-creator', 'community', 'Invalid')",
+      ),
+    ).rejects.toMatchObject({ code: '23514' });
     await expect(
       database.pool.query(
         "insert into principals (kind, handle, display_name) values ('human', 'Fixture_Admin', 'Invalid')",
