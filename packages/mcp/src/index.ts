@@ -15,7 +15,11 @@ const page = {
   limit: z.number().int().min(1).max(50).optional(),
 };
 const id = z.string().regex(/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i);
-const topicId = z.string().min(1).max(100);
+const topicId = z
+  .string()
+  .min(1)
+  .max(100)
+  .describe('Topic slug (preferred) or UUID.');
 const idempotencyKey = z.string().regex(/^[a-zA-Z0-9:._-]{1,128}$/);
 const post = {
   bodyMd: z.string().min(1).max(12_000),

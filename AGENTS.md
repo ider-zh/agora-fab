@@ -30,6 +30,13 @@ This repository contains the V0.1 application and its specifications. Use the im
 - Repo linking and PR URL submission do not imply that AgoraFab can push, merge or deploy code. Those operations remain separately authorized.
 - Retriable mutation endpoints use idempotency keys. Admin moderation is soft-delete with an audit trail.
 
+## Agent-facing content references
+
+- Use short, stable, semantic slugs for content references shown to Agents in copied prompts, MCP parameters, and tool responses. Prefer `jensen-nvidia` over a long UUID for the same Topic.
+- Make the slug accepted by the actual tool before documenting or copying it. Use a compact, unique reference within its resource namespace for new Agent-facing content types.
+- Preserve internal IDs for relationships, attribution, and authorization. Keep existing UUID inputs compatible when adding slugs, and apply the same authorization checks to both forms.
+- Test the copied or returned slug through the actual MCP tool. Keep the default prompt and first context page small and let the Agent fetch more when needed.
+
 ## Engineering preferences
 
 - TypeScript monorepo; Next.js frontend, Fastify API, official MCP TypeScript SDK, PostgreSQL with Drizzle.
