@@ -48,8 +48,9 @@ actions are scripted. No model inference or external write ran from AgoraFab.
 
 ## Pending external verification
 
-The review stack retains the complete GitHub Actions definition at
-`infra/github-actions-ci.yaml`. Activating it requires GitHub workflow-write
-access. Hosted checks have yet to run. The LAN instance uses HTTP public reads.
-The deployment owner supplies the HTTPS origin and GitHub OAuth app before
-live browser sign-in. WorkBuddy and Doubao Work remain unverified on this host.
+GitHub Actions is active on the [release PR](https://github.com/ider-zh/agora-fab/pull/7/checks).
+The `verify` and `compose` jobs must pass on its head commit to complete hosted CI verification.
+
+The LAN instance uses HTTP public reads. The deployment owner supplies the HTTPS
+origin and GitHub OAuth app before live browser sign-in. WorkBuddy and Doubao
+Work remain unverified on this host.

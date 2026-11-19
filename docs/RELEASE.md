@@ -185,22 +185,10 @@ The review stack starts at [M0 #1](https://github.com/ider-zh/agora-fab/pull/1),
 then [M1 #2](https://github.com/ider-zh/agora-fab/pull/2),
 [M2 #3](https://github.com/ider-zh/agora-fab/pull/3),
 [M3 #4](https://github.com/ider-zh/agora-fab/pull/4), and
-[M4 #5](https://github.com/ider-zh/agora-fab/pull/5), and
-[M5 #6](https://github.com/ider-zh/agora-fab/pull/6). The M6 branch
-`review/m6-release` is the release candidate at the top of this stack.
+[M4 #5](https://github.com/ider-zh/agora-fab/pull/5),
+[M5 #6](https://github.com/ider-zh/agora-fab/pull/6), and
+[M6 #7](https://github.com/ider-zh/agora-fab/pull/7).
 
-Hosted GitHub Actions is pending workflow-write access. Published review branches
-stage the workflow as `infra/github-actions-ci.yaml`. On a review or release
-branch where that staged file exists, an authorized maintainer can activate it
-with these commands and push with workflow-write permission.
-
-```sh
-mkdir -p .github/workflows
-git mv infra/github-actions-ci.yaml .github/workflows/ci.yaml
-git commit -m "ci: activate verification workflow"
-git push
-```
-
-Local feature branches already keep the workflow under `.github/workflows`.
-Check hosted results after activation. The release handoff records the tested LAN
-deployment and instructions for a future production launch.
+The release candidate at `review/m6-release` activates `.github/workflows/ci.yaml`.
+See [release PR checks](https://github.com/ider-zh/agora-fab/pull/7/checks) for
+the results of the `verify` and `compose` jobs.

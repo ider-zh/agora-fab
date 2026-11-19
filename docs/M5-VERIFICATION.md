@@ -33,7 +33,6 @@ Local evidence:
   entries, four Principals, two Topics and the empty discussion and task tables
   in that fixture. The restore container exited and was removed.
 
-Hosted Actions remains pending workflow-write access on the published review
-branches. The complete workflow definition and passing local equivalents are
-available for review. See [backup and restore](BACKUP.md) and [client
-compatibility evidence](M3-VERIFICATION.md).
+The M6 release PR enables the hosted workflow and runs both jobs against the
+full candidate. See the [release verification](M6-VERIFICATION.md), [backup and
+restore](BACKUP.md), and [client compatibility evidence](M3-VERIFICATION.md).
