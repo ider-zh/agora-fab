@@ -29,6 +29,7 @@ import {
 import { uuidPattern } from '../http-validation.js';
 import { idempotent, type Transaction } from '../idempotency.js';
 import type { AuthorizeMutation } from '../traffic.js';
+import { agentTitle, randomAgentHandle } from './agent-name.js';
 import {
   agentTokenPattern,
   assertOrigin,
@@ -182,6 +183,24 @@ export function createIdentityService(
         .where(eq(sessions.tokenHash, digest(token)));
   }
 
+  async function suggestAgent(auth: AuthContext | null) {
+    authorize(auth, 'admin');
+    for (let attempt = 0; attempt < 16; attempt++) {
+      const handle = randomAgentHandle(attempt >= 8);
+      const [existing] = await database.db
+        .select({ id: principals.id })
+        .from(principals)
+        .where(eq(principals.handle, handle))
+        .limit(1);
+      if (!existing) return { handle, title: agentTitle(handle) };
+    }
+    throw new DomainError(
+      409,
+      'HANDLE_UNAVAILABLE',
+      'Could not suggest an available Agent name.',
+    );
+  }
+
   async function inviteAgent(
     auth: AuthContext | null,
     key: string,
@@ -193,75 +212,88 @@ export function createIdentityService(
       platform: string;
       capabilities: string[];
     },
+    preferredHandle?: string,
   ) {
     const actor = authorize(auth, 'admin');
     return idempotent<{
       principal: Principal;
       credential?: Awaited<ReturnType<typeof createCredential>>['credential'];
-    }>(database, actor.id, 'agent.invite', key, input ?? {}, async (tx) => {
-      const ownerPrincipalId = input?.ownerPrincipalId ?? actor.id;
-      const [owner] = await tx
-        .select({ id: principals.id })
-        .from(principals)
-        .where(
-          and(
-            input?.ownerHandle
-              ? eq(principals.handle, input.ownerHandle)
-              : eq(principals.id, ownerPrincipalId),
-            eq(principals.kind, 'human'),
-            eq(principals.status, 'active'),
-          ),
-        )
-        .for('share');
-      if (!owner)
-        throw new DomainError(
-          422,
-          'INVALID_OWNER',
-          'The owner must be an active human principal.',
-        );
-      let row: typeof principals.$inferSelect | undefined;
-      // Manual handles report a conflict. Generated handles retry against the same unique index.
-      for (let attempt = 0; attempt < (input ? 1 : 5); attempt++) {
-        const suffix = input ? '' : randomBytes(5).toString('hex');
-        [row] = await tx
-          .insert(principals)
-          .values({
-            ...(input ?? {
-              handle: `agent_${suffix}`,
-              displayName: `Agent ${suffix.toUpperCase()}`,
-              ownerPrincipalId,
-              platform: 'MCP',
-              capabilities: [],
-            }),
-            ownerPrincipalId: owner.id,
-            kind: 'agent',
-          })
-          .onConflictDoNothing({ target: principals.handle })
-          .returning();
-        if (row) break;
-      }
-      if (!row)
-        throw new DomainError(
-          409,
-          'HANDLE_UNAVAILABLE',
-          'This handle is already in use.',
-        );
-      await tx.insert(auditEvents).values({
-        actorId: actor.id,
-        action: 'agent.invite',
-        targetType: 'principal',
-        targetId: row.id,
-      });
-      const principal = serializePrincipal(row);
-      if (input) return { stored: { principal } };
+    }>(
+      database,
+      actor.id,
+      'agent.invite',
+      key,
+      input ?? (preferredHandle ? { preferredHandle } : {}),
+      async (tx) => {
+        const ownerPrincipalId = input?.ownerPrincipalId ?? actor.id;
+        const [owner] = await tx
+          .select({ id: principals.id })
+          .from(principals)
+          .where(
+            and(
+              input?.ownerHandle
+                ? eq(principals.handle, input.ownerHandle)
+                : eq(principals.id, ownerPrincipalId),
+              eq(principals.kind, 'human'),
+              eq(principals.status, 'active'),
+            ),
+          )
+          .for('share');
+        if (!owner)
+          throw new DomainError(
+            422,
+            'INVALID_OWNER',
+            'The owner must be an active human principal.',
+          );
+        let row: typeof principals.$inferSelect | undefined;
+        // Manual handles report a conflict. Generated handles retry against the same unique index.
+        for (
+          let attempt = 0;
+          attempt < (input || preferredHandle ? 1 : 16);
+          attempt++
+        ) {
+          const handle =
+            input?.handle ?? preferredHandle ?? randomAgentHandle(attempt >= 8);
+          [row] = await tx
+            .insert(principals)
+            .values({
+              ...(input ?? {
+                handle,
+                displayName: agentTitle(handle),
+                ownerPrincipalId,
+                platform: 'MCP',
+                capabilities: [],
+              }),
+              ownerPrincipalId: owner.id,
+              kind: 'agent',
+            })
+            .onConflictDoNothing({ target: principals.handle })
+            .returning();
+          if (row) break;
+        }
+        if (!row)
+          throw new DomainError(
+            409,
+            'HANDLE_UNAVAILABLE',
+            'This handle is already in use.',
+          );
+        await tx.insert(auditEvents).values({
+          actorId: actor.id,
+          action: 'agent.invite',
+          targetType: 'principal',
+          targetId: row.id,
+        });
+        const principal = serializePrincipal(row);
+        if (input) return { stored: { principal } };
 
-      const { credential, transient } = await createCredential(tx, actor.id, {
-        agentId: row.id,
-        scopes: ['community:write'],
-        expiresInHours: 168,
-      });
-      return { stored: { principal, credential }, transient };
-    });
+        const { credential, transient } = await createCredential(tx, actor.id, {
+          agentId: row.id,
+          scopes: ['community:write'],
+          expiresInHours: 168,
+        });
+        return { stored: { principal, credential }, transient };
+      },
+    );
   }
 
   async function renameAgent(
@@ -575,6 +607,7 @@ export function createIdentityService(
     authenticateMutation,
     logout,
     inviteAgent,
+    suggestAgent,
     renameAgent,
     issueToken,
     revokeToken,

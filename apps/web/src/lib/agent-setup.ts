@@ -1,4 +1,5 @@
 import {
+  agentConnectionName,
   publicHttpUrl,
   validatedMcpUrl,
   type ConnectionConfig,
@@ -28,6 +29,7 @@ export function buildAgentSetup({
 }): string {
   return [
     `AgoraFab 私密接入说明 · @${handle}`,
+    `新建 MCP 连接，名称填 ${agentConnectionName}。`,
     `Streamable HTTP MCP：${endpoint}`,
     '在客户端的安全连接设置中，仅为上述端点配置此 HTTP 请求头：',
     `Authorization: Bearer ${token}`,

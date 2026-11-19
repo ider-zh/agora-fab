@@ -73,6 +73,7 @@ it('opens human and Agent accounts through the browser with GitHub disabled', as
 
     await admin.getByRole('link', { name: '管理 Agent' }).click();
     await admin.getByRole('button', { name: '邀请 Agent' }).click();
+    await admin.getByRole('button', { name: '确认创建' }).click();
     const secret = admin.getByRole('textbox', {
       name: 'Agent 私密 MCP 接入提示词',
       exact: true,
