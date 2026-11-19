@@ -5,7 +5,12 @@ import {
   topics,
   type Database,
 } from '@agorafab/db';
-import { DomainError, requireAction, type AuthContext } from '@agorafab/domain';
+import {
+  DomainError,
+  requireAction,
+  requirePrincipal,
+  type AuthContext,
+} from '@agorafab/domain';
 import { and, asc, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { invalidInput, requiredText, uuid } from '../http-validation.js';
 import {
@@ -89,9 +94,12 @@ export function createCommunityReader(database: Database) {
   }
 
   async function listTopics(
+    auth: AuthContext | null,
     options: ListPageOptions = {},
     includeArchived = false,
   ) {
+    if (includeArchived) requireAction(auth, 'admin');
+    else requirePrincipal(auth);
     const scope = includeArchived ? 'topics:all' : 'topics:active';
     const { limit, position } = readCursor(options, scope);
     const rows = await db
@@ -108,7 +116,13 @@ export function createCommunityReader(database: Database) {
     return slicePage(rows, limit, scope);
   }
 
-  async function getTopic(idOrSlug: string, includeArchived = false) {
+  async function getTopic(
+    auth: AuthContext | null,
+    idOrSlug: string,
+    includeArchived = false,
+  ) {
+    if (includeArchived) requireAction(auth, 'admin');
+    else requirePrincipal(auth);
     const value = requiredText(idOrSlug, 100);
     const [topic] = await db
       .select(topicColumns)
@@ -122,10 +136,11 @@ export function createCommunityReader(database: Database) {
   }
 
   async function listPosts(
+    auth: AuthContext | null,
     topicIdOrSlug: string,
     options: ListPageOptions = {},
   ) {
-    const topic = await getTopic(topicIdOrSlug);
+    const topic = await getTopic(auth, topicIdOrSlug);
     const scope = `posts:${topic.id}`;
     const { limit, position } = readCursor(options, scope);
     const rows = await publicPosts()
@@ -143,7 +158,12 @@ export function createCommunityReader(database: Database) {
     return slicePage(rows, limit, scope);
   }
 
-  async function getPost(postId: string, options: ListPageOptions = {}) {
+  async function getPost(
+    auth: AuthContext | null,
+    postId: string,
+    options: ListPageOptions = {},
+  ) {
+    requirePrincipal(auth);
     const id = uuid(postId);
     const scope = `replies:${id}`;
     const { limit, position } = readCursor(options, scope);
@@ -167,7 +187,11 @@ export function createCommunityReader(database: Database) {
     return { post, replies: items, nextCursor };
   }
 
-  async function search({ q, ...options }: ListPageOptions & { q: string }) {
+  async function search(
+    auth: AuthContext | null,
+    { q, ...options }: ListPageOptions & { q: string },
+  ) {
+    requirePrincipal(auth);
     const query = requiredText(q, 120);
     const scope = `search:${query}`;
     const { limit, position } = readCursor(options, scope);
@@ -192,7 +216,12 @@ export function createCommunityReader(database: Database) {
     return slicePage(rows, limit, scope);
   }
 
-  async function listPinned(topicId: string, requestedLimit?: number) {
+  async function listPinned(
+    auth: AuthContext | null,
+    topicId: string,
+    requestedLimit?: number,
+  ) {
+    requirePrincipal(auth);
     const id = uuid(topicId);
     const { limit } = readCursor({ limit: requestedLimit }, `pinned:${id}`, 5);
     return publicPosts()

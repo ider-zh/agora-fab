@@ -73,7 +73,7 @@ const rpcHeaders = {
 const topicId = 'daily-inspiration';
 
 describe('official SDK clients over Streamable HTTP', () => {
-  it('negotiates a stateless session and serves public reads while ignoring browser cookies', async () => {
+  it('allows stateless tool discovery and requires Agent credentials for content', async () => {
     await withClient(
       { cookie: fixture.admin.cookie },
       async (client, transport) => {
@@ -91,14 +91,19 @@ describe('official SDK clients over Streamable HTTP', () => {
             'get_notifications',
           ]),
         );
-        const topics = await tool(client, 'list_topics');
-        expect(topics.structuredContent?.items).toEqual(
-          expect.arrayContaining([expect.objectContaining({ slug: topicId })]),
-        );
-        expect(topics.content[0]).toEqual({
-          type: 'text',
-          text: JSON.stringify(topics.structuredContent),
-        });
+        for (const [name, args] of [
+          ['list_topics', {}],
+          ['get_topic_context', { topicId }],
+          ['list_posts', { topicId }],
+          ['get_post', { postId: randomUUID() }],
+          ['list_tasks', { topicId: fixture.fixtureIds.project }],
+        ] as const) {
+          const result = await tool(client, name, args);
+          expectToolError(result, 'UNAUTHORIZED');
+          expect(Object.keys(result.structuredContent ?? {})).toEqual([
+            'error',
+          ]);
+        }
         expectToolError(
           await tool(client, 'list_topics', { privateCredential: true }),
           'VALIDATION_ERROR',
@@ -117,6 +122,19 @@ describe('official SDK clients over Streamable HTTP', () => {
         );
       },
     );
+    const credential = await fixture.issue(fixture.fixtureIds.agentA, [
+      'notifications:read',
+    ]);
+    await withClient(credential, async (client) => {
+      const topics = await tool(client, 'list_topics');
+      expect(topics.structuredContent?.items).toEqual(
+        expect.arrayContaining([expect.objectContaining({ slug: topicId })]),
+      );
+      expect(topics.content[0]).toEqual({
+        type: 'text',
+        text: JSON.stringify(topics.structuredContent),
+      });
+    });
   });
 
   it('uses the same authors, writes and idempotency keys as REST and isolates inboxes', async () => {
@@ -219,6 +237,9 @@ describe('official SDK clients over Streamable HTTP', () => {
         headers: fixture.admin,
       });
       expect(revoked.statusCode).toBe(204);
+      await expect(tool(client, 'list_topics')).rejects.toMatchObject({
+        code: 401,
+      });
       await expect(tool(client, 'get_notifications')).rejects.toMatchObject({
         code: 401,
       });
@@ -240,7 +261,7 @@ describe('official SDK clients over Streamable HTTP', () => {
       expect(response.statusCode).toBe(201);
       ids.push(response.json<{ post: { id: string } }>().post.id);
     }
-    await withClient({}, async (client) => {
+    await withClient(agent, async (client) => {
       const first = await tool(client, 'get_topic_context', {
         topicId,
         limit: 2,

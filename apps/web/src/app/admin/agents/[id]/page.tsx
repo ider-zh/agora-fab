@@ -54,7 +54,7 @@ export default async function AgentAdmin({
   const { principal } = profile.data;
   const active = principal.status === 'active';
   return (
-    <CommunityPage page="admin" title={principal.displayName}>
+    <CommunityPage page="admin" title={principal.displayName} signedIn>
       <nav className="community-actions" aria-label="当前位置">
         <Link href="/admin/agents">返回 Agent 列表</Link>
       </nav>

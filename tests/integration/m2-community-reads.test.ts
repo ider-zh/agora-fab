@@ -3,12 +3,27 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createCommunityReader } from '../../apps/api/src/community/read.js';
 import { createDatabase, type Database } from '../../packages/db/src/index.js';
 import { migrateDatabase } from '../../packages/db/src/migrations.js';
+import type { AuthContext } from '../../packages/domain/src/index.js';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 if (!testDatabaseUrl) throw new Error('TEST_DATABASE_URL is required.');
 
 const schema = `agorafab_community_reads_${randomUUID().replaceAll('-', '')}`;
 const authorId = randomUUID();
+const readerSession: AuthContext = {
+  method: 'session',
+  principal: {
+    id: authorId,
+    kind: 'human',
+    handle: 'reader_fixture',
+    displayName: 'Test Author',
+    role: 'admin',
+    status: 'active',
+    ownerPrincipalId: null,
+    platform: null,
+    capabilities: [],
+  },
+};
 const topicId = randomUUID();
 const archivedTopicId = randomUUID();
 const root = randomUUID();
@@ -132,22 +147,26 @@ describe('M2 community reader on PostgreSQL', () => {
   });
 
   it('lists active Topics and looks them up by stable ID or slug', async () => {
-    const { items } = await reader.listTopics();
+    const { items } = await reader.listTopics(readerSession);
     expect(items.map((topic) => topic.id)).toEqual([topicId]);
-    expect(await reader.getTopic('readers-corner')).toEqual(
-      await reader.getTopic(topicId),
+    expect(await reader.getTopic(readerSession, 'readers-corner')).toEqual(
+      await reader.getTopic(readerSession, topicId),
     );
-    await expect(reader.getTopic(archivedTopicId)).rejects.toMatchObject({
+    await expect(
+      reader.getTopic(readerSession, archivedTopicId),
+    ).rejects.toMatchObject({
       statusCode: 404,
     });
-    const all = await reader.listTopics({}, true);
+    const all = await reader.listTopics(readerSession, {}, true);
     expect(all.items.map((topic) => topic.id)).toEqual(
       expect.arrayContaining([topicId, archivedTopicId]),
     );
   });
 
   it('keeps exact timestamps and UUID ties in feed cursors across concurrent insertion', async () => {
-    const first = await reader.listPosts(topicId, { limit: '1' });
+    const first = await reader.listPosts(readerSession, topicId, {
+      limit: '1',
+    });
     expect(first.items.map((post) => post.id)).toEqual([root]);
     expect(first.items[0]?.createdAt).toBe('2026-01-01T00:00:00.123900Z');
     if (!first.nextCursor) throw new Error('Expected a continuation cursor.');
@@ -155,31 +174,32 @@ describe('M2 community reader on PostgreSQL', () => {
       body: 'Inserted after first page',
     });
 
-    const second = await reader.listPosts('readers-corner', {
+    const second = await reader.listPosts(readerSession, 'readers-corner', {
       limit: 1,
       cursor: first.nextCursor,
     });
     expect(second.items.map((post) => post.id)).toEqual([sameTime]);
     if (!second.nextCursor) throw new Error('Expected a continuation cursor.');
-    const third = await reader.listPosts(topicId, {
+    const third = await reader.listPosts(readerSession, topicId, {
       limit: 1,
       cursor: second.nextCursor,
     });
     expect(third.items.map((post) => post.id)).toEqual([older]);
     expect(third.nextCursor).toBeNull();
-    expect((await reader.listPosts(topicId, { limit: 1 })).items[0]?.id).toBe(
-      newest,
-    );
+    expect(
+      (await reader.listPosts(readerSession, topicId, { limit: 1 })).items[0]
+        ?.id,
+    ).toBe(newest);
     await expect(
-      reader.listTopics({ cursor: first.nextCursor }),
+      reader.listTopics(readerSession, { cursor: first.nextCursor }),
     ).rejects.toMatchObject({ code: 'INVALID_CURSOR' });
     await expect(
-      reader.listPosts(topicId, { cursor: 'not-valid' }),
+      reader.listPosts(readerSession, topicId, { cursor: 'not-valid' }),
     ).rejects.toMatchObject({ code: 'INVALID_CURSOR' });
   });
 
-  it('hides moderated descendants and archived Topic content from every public read', async () => {
-    const thread = await reader.getPost(root, { limit: 1 });
+  it('hides moderated descendants and archived Topic content from every ordinary read', async () => {
+    const thread = await reader.getPost(readerSession, root, { limit: 1 });
     expect(thread.post.author).toEqual({
       id: authorId,
       handle: 'reader_fixture',
@@ -188,31 +208,45 @@ describe('M2 community reader on PostgreSQL', () => {
     });
     expect(thread.replies.map((post) => post.id)).toEqual([visibleChild]);
     if (!thread.nextCursor) throw new Error('Expected a reply cursor.');
-    const next = await reader.getPost(root, { cursor: thread.nextCursor });
+    const next = await reader.getPost(readerSession, root, {
+      cursor: thread.nextCursor,
+    });
     expect(next.replies.map((post) => post.id)).toEqual([visibleGrandchild]);
     expect(next.replies[0]?.parentPostId).toBe(visibleChild);
     expect(next.nextCursor).toBeNull();
     await expect(
-      reader.getPost(visibleChild, { cursor: thread.nextCursor }),
+      reader.getPost(readerSession, visibleChild, {
+        cursor: thread.nextCursor,
+      }),
     ).rejects.toMatchObject({ code: 'INVALID_CURSOR' });
     for (const id of [hidden, hiddenChild, archive]) {
-      await expect(reader.getPost(id)).rejects.toMatchObject({
+      await expect(reader.getPost(readerSession, id)).rejects.toMatchObject({
         statusCode: 404,
       });
     }
-    expect((await reader.listPinned(topicId)).map((post) => post.id)).toEqual([
-      root,
-    ]);
-    expect(await reader.listPinned(archivedTopicId)).toEqual([]);
-    expect((await reader.search({ q: 'Confidential' })).items).toEqual([]);
     expect(
-      (await reader.search({ q: '值得讨论' })).items.map((post) => post.id),
+      (await reader.listPinned(readerSession, topicId)).map((post) => post.id),
     ).toEqual([root]);
-    const search = await reader.search({ q: 'project', limit: 1 });
+    expect(await reader.listPinned(readerSession, archivedTopicId)).toEqual([]);
+    expect(
+      (await reader.search(readerSession, { q: 'Confidential' })).items,
+    ).toEqual([]);
+    expect(
+      (await reader.search(readerSession, { q: '值得讨论' })).items.map(
+        (post) => post.id,
+      ),
+    ).toEqual([root]);
+    const search = await reader.search(readerSession, {
+      q: 'project',
+      limit: 1,
+    });
     expect(search.items.map((post) => post.id)).toEqual([visibleChild]);
     if (!search.nextCursor) throw new Error('Expected a continuation cursor.');
     await expect(
-      reader.search({ q: 'observable', cursor: search.nextCursor }),
+      reader.search(readerSession, {
+        q: 'observable',
+        cursor: search.nextCursor,
+      }),
     ).rejects.toMatchObject({ code: 'INVALID_CURSOR' });
   });
 

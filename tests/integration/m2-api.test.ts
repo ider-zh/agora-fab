@@ -21,6 +21,63 @@ const discussionScopes = [
 ];
 
 describe('community API with real PostgreSQL', () => {
+  it('returns a generic uncached 401 for anonymous content reads and allows authenticated readers', async () => {
+    const { app, human, issue, fixtureIds } = fixture;
+    const reader = await issue(fixtureIds.agentA, ['notifications:read']);
+    const post = await app.inject({
+      method: 'POST',
+      url: feed,
+      headers: { ...human, ...key() },
+      payload: { bodyMd: 'Private community read regression' },
+    });
+    expect(post.statusCode).toBe(201);
+
+    const routes = [
+      '/api/topics',
+      '/api/topics/daily-inspiration',
+      '/api/topics/fixture-project',
+      '/api/topics/missing-topic',
+      feed,
+      `/api/posts/${post.json().post.id}`,
+      '/api/posts/invalid-id',
+      '/api/search?q=Private',
+    ];
+    for (const url of routes) {
+      for (const method of ['GET', 'HEAD'] as const) {
+        const denied = await app.inject({ method, url });
+        expect(denied.statusCode, url).toBe(401);
+        expect(denied.headers['cache-control']).toBe('no-store');
+        if (method === 'GET') {
+          expect(denied.json()).toEqual({
+            error: {
+              code: 'UNAUTHORIZED',
+              message: 'Sign-in or a valid token is required.',
+              requestId: expect.any(String),
+            },
+          });
+        }
+      }
+    }
+    for (const headers of [human, reader]) {
+      const allowed = await app.inject({ url: feed, headers });
+      expect(allowed.statusCode).toBe(200);
+      expect(allowed.headers['cache-control']).toBe('no-store');
+      expect(allowed.json().items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: post.json().post.id }),
+        ]),
+      );
+    }
+    expect(
+      (
+        await app.inject({
+          url: feed,
+          headers: { authorization: 'Bearer invalid' },
+        })
+      ).statusCode,
+    ).toBe(401);
+  });
+
   it('attributes humans and two independent agent credentials, deduplicates retries and persists mention receipts', async () => {
     const { app, human, issue, fixtureIds, database } = fixture;
     const agentA = await issue(fixtureIds.agentA, discussionScopes);
@@ -138,7 +195,7 @@ describe('community API with real PostgreSQL', () => {
     expect(replyB.statusCode, replyB.body).toBe(201);
     expect(replyB.json().post.author.id).toBe(fixtureIds.agentB);
     expect(
-      (await app.inject({ url: `/api/posts/${post.id}` }))
+      (await app.inject({ url: `/api/posts/${post.id}`, headers: human }))
         .json()
         .replies.map((item: { id: string }) => item.id),
     ).toEqual([child.id, replyB.json().post.id]);
@@ -155,6 +212,9 @@ describe('community API with real PostgreSQL', () => {
       (await app.inject({ ...submit, headers: { ...agentA, ...key() } }))
         .statusCode,
     ).toBe(401);
+    expect((await app.inject({ url: feed, headers: agentA })).statusCode).toBe(
+      401,
+    );
   });
 
   it('audits moderation, hides descendant and search results, and archives Topics', async () => {
@@ -205,8 +265,9 @@ describe('community API with real PostgreSQL', () => {
       });
     expect((await modify('pin')).statusCode).toBe(204);
     expect(
-      (await app.inject({ url: `/api/topics/${topic.slug}` })).json()
-        .pinnedPosts[0].id,
+      (
+        await app.inject({ url: `/api/topics/${topic.slug}`, headers: human })
+      ).json().pinnedPosts[0].id,
     ).toBe(post.id);
     expect((await modify('hide', human)).statusCode).toBe(403);
     expect((await modify('hide')).statusCode).toBe(204);
@@ -216,13 +277,16 @@ describe('community API with real PostgreSQL', () => {
         .items.some((note: { postId: string }) => note.postId === post.id),
     ).toBe(false);
     expect(
-      (await app.inject({ url: `/api/posts/${post.id}` })).statusCode,
+      (await app.inject({ url: `/api/posts/${post.id}`, headers: human }))
+        .statusCode,
     ).toBe(404);
     expect(
-      (await app.inject({ url: `/api/posts/${child.id}` })).statusCode,
+      (await app.inject({ url: `/api/posts/${child.id}`, headers: human }))
+        .statusCode,
     ).toBe(404);
     expect(
-      (await app.inject({ url: '/api/search?q=unique' })).json().items,
+      (await app.inject({ url: '/api/search?q=unique', headers: human })).json()
+        .items,
     ).toEqual([]);
     expect(
       (await app.inject({ url: `/api/admin/posts/${post.id}`, headers: human }))
@@ -243,7 +307,8 @@ describe('community API with real PostgreSQL', () => {
     });
     expect((await modify('restore')).statusCode).toBe(204);
     expect(
-      (await app.inject({ url: `/api/posts/${child.id}` })).statusCode,
+      (await app.inject({ url: `/api/posts/${child.id}`, headers: human }))
+        .statusCode,
     ).toBe(200);
     expect(
       (
@@ -256,10 +321,12 @@ describe('community API with real PostgreSQL', () => {
       ).statusCode,
     ).toBe(200);
     expect(
-      (await app.inject({ url: `/api/topics/${topic.slug}` })).statusCode,
+      (await app.inject({ url: `/api/topics/${topic.slug}`, headers: human }))
+        .statusCode,
     ).toBe(404);
     expect(
-      (await app.inject({ url: `/api/posts/${child.id}` })).statusCode,
+      (await app.inject({ url: `/api/posts/${child.id}`, headers: human }))
+        .statusCode,
     ).toBe(404);
   });
 });

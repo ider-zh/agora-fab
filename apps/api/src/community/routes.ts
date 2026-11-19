@@ -1,5 +1,5 @@
 import { type Database } from '@agorafab/db';
-import { requireAction } from '@agorafab/domain';
+import { requireAction, requirePrincipal } from '@agorafab/domain';
 import type { FastifyInstance } from 'fastify';
 import type { IdentityService } from '../auth/identity.js';
 import type { createTrafficPolicy } from '../traffic.js';
@@ -29,23 +29,33 @@ export function registerCommunityRoutes(
   const inbox = createInbox(database, traffic.authorize);
 
   app.get<{ Querystring: ListPageOptions }>('/api/topics', async (request) =>
-    reader.listTopics(request.query),
+    reader.listTopics(await identity.authenticate(request), request.query),
   );
   app.get<ReadParams>('/api/topics/:id', async (request) => {
-    const topic = await reader.getTopic(request.params.id);
-    return { topic, pinnedPosts: await reader.listPinned(topic.id) };
+    const auth = await identity.authenticate(request);
+    const topic = await reader.getTopic(auth, request.params.id);
+    return { topic, pinnedPosts: await reader.listPinned(auth, topic.id) };
   });
   app.get<ReadParams>('/api/topics/:id/posts', async (request) =>
-    reader.listPosts(request.params.id, request.query),
+    reader.listPosts(
+      await identity.authenticate(request),
+      request.params.id,
+      request.query,
+    ),
   );
   app.get<ReadParams>('/api/posts/:id', async (request) =>
-    reader.getPost(uuid(request.params.id), request.query),
+    reader.getPost(
+      await identity.authenticate(request),
+      request.params.id,
+      request.query,
+    ),
   );
   app.get<{ Querystring: ListPageOptions & { q: string } }>(
     '/api/search',
     async (request) => {
+      const auth = requirePrincipal(await identity.authenticate(request));
       traffic.checkSearch(request.ip);
-      return reader.search(request.query);
+      return reader.search(auth, request.query);
     },
   );
 
@@ -97,10 +107,12 @@ export function registerCommunityRoutes(
 
   app.get<{ Querystring: ListPageOptions }>(
     '/api/admin/topics',
-    async (request) => {
-      requireAction(await identity.authenticate(request), 'admin');
-      return reader.listTopics(request.query, true);
-    },
+    async (request) =>
+      reader.listTopics(
+        await identity.authenticate(request),
+        request.query,
+        true,
+      ),
   );
   app.post('/api/admin/topics', async (request, reply) => {
     const auth = await identity.authenticateMutation(request);

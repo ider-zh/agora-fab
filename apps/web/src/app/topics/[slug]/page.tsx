@@ -1,4 +1,3 @@
-import { headers } from 'next/headers';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { JoinPrompt } from '../../../components/community/join-prompt';
@@ -11,7 +10,7 @@ import {
   PostCard,
   ReadProblem,
 } from '../../../components/community/views';
-import { getAccount } from '../../../lib/account';
+import { requireContentAccount } from '../../../lib/content-account';
 import { buildJoinPrompt } from '../../../lib/join-prompt';
 import { readCommunity } from '../../../lib/community-read';
 import {
@@ -33,25 +32,24 @@ export default async function TopicPage({
     taskCursor?: string | string[];
   }>;
 }) {
-  const [{ slug }, { cursor, taskCursor }, requestHeaders] = await Promise.all([
-    params,
-    searchParams,
-    headers(),
-  ]);
+  const [{ slug }, { cursor, taskCursor }, { cookies, profile }] =
+    await Promise.all([params, searchParams, requireContentAccount()]);
   const ref = encodeURIComponent(slug);
   const path = `/topics/${ref}`;
   const apiPath = `/api${path}`;
-  const [result, posts, account] = await Promise.all([
-    readCommunity<{ topic: Topic; pinnedPosts?: Post[] }>(apiPath),
+  const [result, posts] = await Promise.all([
+    readCommunity<{ topic: Topic; pinnedPosts?: Post[] }>(apiPath, cookies),
     typeof cursor === 'object'
       ? { status: 'invalid' as const }
-      : readCommunity<Page<Post>>(queryPath(`${apiPath}/posts`, { cursor })),
-    getAccount(requestHeaders.get('cookie')),
+      : readCommunity<Page<Post>>(
+          queryPath(`${apiPath}/posts`, { cursor }),
+          cookies,
+        ),
   ]);
   if (result.status === 'not-found') notFound();
   if (result.status !== 'ok')
     return (
-      <CommunityPage page="topics" title="Topic">
+      <CommunityPage page="topics" title="Topic" signedIn>
         <ReadProblem status={result.status} />
       </CommunityPage>
     );
@@ -60,10 +58,9 @@ export default async function TopicPage({
     WEB_PUBLIC_ORIGIN: process.env.WEB_PUBLIC_ORIGIN,
     MCP_PUBLIC_URL: process.env.MCP_PUBLIC_URL,
   });
-  const admin =
-    account.status === 'signed-in' && account.profile.role === 'admin';
+  const admin = profile.role === 'admin';
   return (
-    <CommunityPage page="topics" title={topic.title}>
+    <CommunityPage page="topics" title={topic.title} signedIn>
       <nav className="community-actions" aria-label="当前位置">
         <Link href="/topics">全部 Topic</Link>
         {admin && <Link href={`/admin#topic-${topic.id}`}>编辑此 Topic</Link>}
@@ -91,7 +88,7 @@ export default async function TopicPage({
           taskCursor={taskCursor}
           cursor={typeof cursor === 'string' ? cursor : undefined}
           admin={admin}
-          signedIn={account.status === 'signed-in'}
+          cookies={cookies}
         />
       )}
       {pinnedPosts.length > 0 && (
@@ -106,10 +103,7 @@ export default async function TopicPage({
       )}
       <section className="community-section">
         <h2>发布帖子</h2>
-        <PostComposer
-          path={`${path}/posts`}
-          signedIn={account.status === 'signed-in'}
-        />
+        <PostComposer path={`${path}/posts`} signedIn />
       </section>
       <section className="community-section">
         <h2>讨论</h2>

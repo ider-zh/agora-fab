@@ -10,13 +10,13 @@ import { Pager, ReadProblem } from './views';
 export async function ProjectTasks({
   topic,
   admin,
-  signedIn,
+  cookies,
   taskCursor,
   cursor,
 }: {
   topic: Topic;
   admin: boolean;
-  signedIn: boolean;
+  cookies: string;
   taskCursor?: string | string[];
   cursor?: string;
 }) {
@@ -27,6 +27,7 @@ export async function ProjectTasks({
           queryPath(`/api/projects/${encodeURIComponent(topic.id)}/tasks`, {
             cursor: taskCursor,
           }),
+          cookies,
         );
   const repo = httpsLink(topic.repoUrl, true);
   const topicPath = `/topics/${encodeURIComponent(topic.slug)}`;
@@ -52,13 +53,7 @@ export async function ProjectTasks({
           )}
         </div>
       )}
-      {signedIn ? (
-        <NewTask topicId={topic.id} admin={admin} />
-      ) : (
-        <p className="community-message">
-          <Link href="/account">登录</Link>后建议或领取任务。
-        </p>
-      )}
+      <NewTask topicId={topic.id} admin={admin} />
       {result.status === 'ok' ? (
         <>
           {result.data.items.length ? (

@@ -24,6 +24,50 @@ async function publish(page: Page, body: string) {
 }
 
 describe('M2 browser workflows with Next.js, Fastify and PostgreSQL', () => {
+  it('hides Topic, Project, post and search views before sign-in and after logout', async () => {
+    const { browser, origin } = fixture;
+    const page = await browser.newPage();
+    const privateBody = 'Authenticated content browser check';
+    try {
+      await page.goto(origin);
+      expect(
+        await page.getByRole('link', { name: 'Topic', exact: true }).count(),
+      ).toBe(0);
+      await page.getByRole('link', { name: '登录后浏览' }).click();
+      await page.waitForURL(`${origin}/account`);
+      await signIn(page, origin, 'participant');
+      await page.goto(`${origin}/topics/fixture-project`);
+      await page.getByRole('heading', { name: 'Example Project' }).waitFor();
+      await page.goto(`${origin}/topics/daily-inspiration`);
+      const post = await publish(page, privateBody);
+      await page.getByText(privateBody, { exact: true }).waitFor();
+      await page.goto(`${origin}/account`);
+      await page.getByRole('button', { name: '退出登录' }).click();
+      await page.getByRole('button', { name: '使用 GitHub 登录' }).waitFor();
+      for (const path of [
+        '/topics',
+        '/topics/daily-inspiration',
+        '/topics/fixture-project',
+        '/topics/not-found',
+        new URL(post).pathname,
+        '/tasks/invalid',
+        '/search?q=Authenticated',
+      ]) {
+        const response = await page.request.get(`${origin}${path}`, {
+          maxRedirects: 0,
+        });
+        expect(response.status(), path).toBe(307);
+        expect(response.headers().location).toBe('/account');
+        expect(response.headers()['cache-control']).toContain('no-store');
+        expect(await response.text()).not.toMatch(
+          /Daily Inspiration|Example Project|Authenticated content browser check/,
+        );
+      }
+    } finally {
+      await page.close();
+    }
+  }, 30_000);
+
   it('lets a participant sign in, publish Markdown, reply and acknowledge a durable mention', async () => {
     const { browser, origin } = fixture;
     const page = await browser.newPage({
@@ -139,11 +183,12 @@ describe('M2 browser workflows with Next.js, Fastify and PostgreSQL', () => {
         .waitFor();
       await screenshot(page, 'm2-browser-moderation');
 
-      const guest = await browser.newPage();
+      const participant = await browser.newPage();
       try {
-        await guest.goto(postUrl);
+        await signIn(participant, origin, 'participant');
+        await participant.goto(postUrl);
         expect(
-          await guest
+          await participant
             .getByText('A post for the browser moderation test.', {
               exact: true,
             })
@@ -155,12 +200,12 @@ describe('M2 browser workflows with Next.js, Fastify and PostgreSQL', () => {
         await page
           .getByRole('button', { name: '隐藏帖子', exact: true })
           .waitFor();
-        expect((await guest.reload())?.status()).toBe(200);
-        await guest
+        expect((await participant.reload())?.status()).toBe(200);
+        await participant
           .getByText('A post for the browser moderation test.', { exact: true })
           .waitFor();
       } finally {
-        await guest.close();
+        await participant.close();
       }
 
       await page.goto(`${origin}/admin`);

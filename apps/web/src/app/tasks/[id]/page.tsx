@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { Markdown } from '../../../components/community/markdown';
 import { TaskActions } from '../../../components/community/project-controls';
@@ -9,7 +8,7 @@ import {
   ReadProblem,
   Time,
 } from '../../../components/community/views';
-import { getAccount } from '../../../lib/account';
+import { requireContentAccount } from '../../../lib/content-account';
 import { readCommunity } from '../../../lib/community-read';
 import { queryPath } from '../../../lib/community-types';
 import {
@@ -29,32 +28,30 @@ export default async function TaskPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ cursor?: string | string[] }>;
 }) {
-  const [{ id }, { cursor }, requestHeaders] = await Promise.all([
+  const [{ id }, { cursor }, { cookies, profile }] = await Promise.all([
     params,
     searchParams,
-    headers(),
+    requireContentAccount(),
   ]);
   const path = `/tasks/${encodeURIComponent(id)}`;
-  const [result, account] = await Promise.all([
+  const result =
     typeof cursor === 'object'
       ? { status: 'invalid' as const }
-      : readCommunity<{
+      : await readCommunity<{
           task: Task;
           artifacts: Artifact[];
           artifactsNextCursor?: string | null;
-        }>(queryPath(`/api${path}`, { cursor })),
-    getAccount(requestHeaders.get('cookie')),
-  ]);
+        }>(queryPath(`/api${path}`, { cursor }), cookies);
   if (result.status === 'not-found') notFound();
   if (result.status !== 'ok')
     return (
-      <CommunityPage page="topics" title="项目任务">
+      <CommunityPage page="topics" title="项目任务" signedIn>
         <ReadProblem status={result.status} reset={path} />
       </CommunityPage>
     );
   const { task, artifacts, artifactsNextCursor } = result.data;
   return (
-    <CommunityPage page="topics" title={task.title}>
+    <CommunityPage page="topics" title={task.title} signedIn>
       <nav className="community-actions" aria-label="当前位置">
         <Link
           href={`/topics/${encodeURIComponent(task.topicId)}#project-tasks`}
@@ -162,16 +159,7 @@ export default async function TaskPage({
           </div>
         </section>
       )}
-      {account.status === 'signed-in' ? (
-        <TaskActions
-          task={task}
-          actor={{ id: account.profile.id, role: account.profile.role }}
-        />
-      ) : (
-        <p className="community-message">
-          <Link href="/account">登录</Link>后参与任务。
-        </p>
-      )}
+      <TaskActions task={task} actor={{ id: profile.id, role: profile.role }} />
     </CommunityPage>
   );
 }
