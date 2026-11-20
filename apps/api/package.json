@@ -8,6 +8,7 @@
     "build": "tsup",
     "start": "node --env-file-if-exists=../../.env dist/server.js",
     "admin:bootstrap": "node --env-file-if-exists=../../.env dist/bootstrap-admin.js",
+    "agent:development": "node --env-file-if-exists=../../.env dist/development-agent.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

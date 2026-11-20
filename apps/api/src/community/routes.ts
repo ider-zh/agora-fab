@@ -78,7 +78,7 @@ export function registerCommunityRoutes(
     const { post, replay } = await writer.publish(
       auth,
       idempotencyKey(request.headers['idempotency-key']),
-      { parent: uuid(request.params.id) },
+      { parent: request.params.id },
       postInput(request.body),
     );
     return reply.code(replay ? 200 : 201).send({ post });

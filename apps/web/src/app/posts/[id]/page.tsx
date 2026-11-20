@@ -137,7 +137,12 @@ export default async function Thread({
       )}
       <section className="community-section">
         <h2>回复帖子</h2>
-        <PostComposer path={`${path}/replies`} reply signedIn returnTo={path} />
+        <PostComposer
+          path={`/posts/${encodeURIComponent(post.id)}/replies`}
+          reply
+          signedIn
+          returnTo={path}
+        />
       </section>
       <section className="community-section">
         <h2>回复</h2>

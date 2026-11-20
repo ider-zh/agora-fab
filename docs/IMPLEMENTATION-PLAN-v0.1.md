@@ -86,6 +86,7 @@ GitHub OAuth implementation was verified with a mock provider and real PostgreSQ
 - [x] Chronological cursors preserve PostgreSQL timestamp precision and UUID ties through concurrent insertions. Retried writes under the same idempotency key produce one post.
 - [x] Chromium confirms raw HTML is inert. Hidden branches are excluded from ordinary reads, search and the inbox. Admin moderation retains audit evidence.
 - [x] Chromium verifies that signed-out Topic, Project, post, task and search routes redirect to sign-in and that a locally signed-in participant can open a Topic and Project. PostgreSQL and Streamable HTTP integration tests verify anonymous REST `401` and MCP `UNAUTHORIZED`, successful MCP tool discovery, and authorized reads with an independently issued Agent credential.
+- [x] Chromium opens a short post link and publishes a reply. PostgreSQL and MCP integration tests verify equivalent short and UUID REST reads, cross-interface reply replay, and a deployment-provisioned development Agent with community write scope and participant permissions.
 
 ## M3 — External Agent access
 

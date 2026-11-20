@@ -1,7 +1,11 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/server.ts', 'src/bootstrap-admin.ts'],
+  entry: [
+    'src/server.ts',
+    'src/bootstrap-admin.ts',
+    'src/development-agent.ts',
+  ],
   format: ['esm'],
   platform: 'node',
   target: 'node22',

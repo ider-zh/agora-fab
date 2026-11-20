@@ -11,6 +11,7 @@ import {
   requirePrincipal,
   type AuthContext,
 } from '@agorafab/domain';
+import { expandResourceId } from '@agorafab/mcp';
 import { and, asc, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { invalidInput, requiredText, uuid } from '../http-validation.js';
 import {
@@ -164,7 +165,7 @@ export function createCommunityReader(database: Database) {
     options: ListPageOptions = {},
   ) {
     requirePrincipal(auth);
-    const id = uuid(postId);
+    const id = uuid(expandResourceId(postId));
     const scope = `replies:${id}`;
     const { limit, position } = readCursor(options, scope);
     const [post] = await publicPosts().where(

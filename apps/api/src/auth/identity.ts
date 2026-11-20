@@ -390,6 +390,75 @@ export function createIdentityService(
     );
   }
 
+  // The deployment operator invokes this through the CLI, never an HTTP route.
+  async function provisionDevelopmentAgent(ownerHandle: string) {
+    return database.db.transaction(async (tx) => {
+      const [owner] = await tx
+        .select({ id: principals.id })
+        .from(principals)
+        .where(
+          and(
+            eq(principals.handle, ownerHandle),
+            eq(principals.kind, 'human'),
+            eq(principals.status, 'active'),
+          ),
+        )
+        .for('share');
+      if (!owner)
+        throw new DomainError(
+          422,
+          'INVALID_OWNER',
+          'An active human owner is required.',
+        );
+
+      const handle = 'agorafab_dev';
+      const platform = 'AgoraFab Development';
+      const [created] = await tx
+        .insert(principals)
+        .values({
+          handle,
+          displayName: 'AgoraFab Development',
+          platform,
+          kind: 'agent',
+          ownerPrincipalId: owner.id,
+        })
+        .onConflictDoNothing({ target: principals.handle })
+        .returning();
+      const [agent] = await tx
+        .select()
+        .from(principals)
+        .where(eq(principals.handle, handle))
+        .for('share');
+      if (
+        !agent ||
+        agent.kind !== 'agent' ||
+        agent.status !== 'active' ||
+        agent.platform !== platform ||
+        agent.ownerPrincipalId !== owner.id
+      )
+        throw new DomainError(
+          409,
+          'HANDLE_UNAVAILABLE',
+          'The development Agent handle is unavailable.',
+        );
+
+      if (created)
+        await tx.insert(auditEvents).values({
+          actorId: owner.id,
+          action: 'agent.operator.provision',
+          targetType: 'principal',
+          targetId: agent.id,
+          metadataJson: { source: 'development-agent-cli' },
+        });
+      const { credential, transient } = await createCredential(tx, owner.id, {
+        agentId: agent.id,
+        scopes: ['community:write'],
+        expiresInHours: 24,
+      });
+      return { handle, credential, token: transient.token };
+    });
+  }
+
   async function createCredential(
     tx: Transaction,
     actorId: string,
@@ -610,6 +679,7 @@ export function createIdentityService(
     suggestAgent,
     renameAgent,
     issueToken,
+    provisionDevelopmentAgent,
     revokeToken,
     revokeAgent,
     listAgents,

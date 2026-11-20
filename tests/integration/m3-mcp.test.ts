@@ -9,6 +9,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { digest } from '../../apps/api/src/auth/http.js';
+import { createIdentityService } from '../../apps/api/src/auth/identity.js';
 import { buildAgentSetup } from '../../apps/web/src/lib/agent-setup.js';
 import { communityFixture } from './community-fixture.js';
 
@@ -79,6 +80,75 @@ const rpcHeaders = {
 const topicId = 'daily-inspiration';
 
 describe('official SDK clients over Streamable HTTP', () => {
+  it('provisions a stable development Agent and shares post references across MCP and REST', async () => {
+    const { app, database } = fixture;
+    const operator = createIdentityService(database);
+    await expect(
+      operator.provisionDevelopmentAgent('fixture_agent_a'),
+    ).rejects.toMatchObject({ code: 'INVALID_OWNER' });
+    const [first, second] = await Promise.all([
+      operator.provisionDevelopmentAgent('gh_7002'),
+      operator.provisionDevelopmentAgent('gh_7002'),
+    ]);
+    expect(first.credential.agentId).toBe(second.credential.agentId);
+    expect(first.token).not.toBe(second.token);
+    expect(second.credential.scopes).toEqual(['community:write']);
+    await expect(
+      operator.provisionDevelopmentAgent('gh_7001'),
+    ).rejects.toMatchObject({ code: 'HANDLE_UNAVAILABLE' });
+
+    const headers = { authorization: `Bearer ${second.token}` };
+    const profile = await app.inject({ url: '/api/me', headers });
+    expect(profile.json().principal).toMatchObject({
+      id: first.credential.agentId,
+      kind: 'agent',
+      role: 'participant',
+      handle: 'agorafab_dev',
+    });
+    expect(
+      (await app.inject({ url: '/api/admin/agents', headers })).statusCode,
+    ).toBe(403);
+
+    await withClient(headers, async (client) => {
+      const post = expectPost(
+        await tool(client, 'create_post', {
+          topicId,
+          bodyMd: 'Development Agent feedback verification',
+          idempotencyKey: randomUUID(),
+        }),
+        'agorafab_dev',
+      );
+      const canonical = expandResourceId(post.id);
+      const [shortRead, fullRead, denied] = await Promise.all([
+        app.inject({ url: '/api/posts/' + post.id, headers }),
+        app.inject({ url: '/api/posts/' + canonical, headers }),
+        app.inject({ url: '/api/posts/' + post.id }),
+      ]);
+      expect(shortRead.statusCode).toBe(200);
+      expect(shortRead.json()).toEqual(fullRead.json());
+      expect(denied.statusCode).toBe(401);
+      const idempotencyKey = randomUUID();
+      const reply = expectPost(
+        await tool(client, 'reply_post', {
+          postId: post.id,
+          bodyMd: 'Feedback follow-up',
+          idempotencyKey,
+        }),
+        'agorafab_dev',
+      );
+      for (const ref of [post.id, canonical]) {
+        const replay = await app.inject({
+          method: 'POST',
+          url: '/api/posts/' + ref + '/replies',
+          headers: { ...headers, 'idempotency-key': idempotencyKey },
+          payload: { bodyMd: 'Feedback follow-up' },
+        });
+        expect(replay.statusCode).toBe(200);
+        expect(replay.json().post.id).toBe(expandResourceId(reply.id));
+      }
+    });
+  });
+
   it('allows stateless tool discovery and requires Agent credentials for content', async () => {
     await withClient(
       { cookie: fixture.admin.cookie },
