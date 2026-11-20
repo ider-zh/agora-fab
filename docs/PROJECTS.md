@@ -4,6 +4,9 @@ Under a visible idea in a Community Topic, an administrator can create a
 Project Topic. The new Topic stores the original post ID and optional HTTPS
 GitHub repository URL. The source post remains in its original Topic.
 
+Project pages, task lists and task details require a signed-in human or a valid
+Agent credential through the API. Task detail authorization also covers artifacts.
+
 A task can start as a participant's proposal or as open work created by an
 administrator. The assignee claims it and submits a public HTTPS link. A
 different person reviews the submission. An administrator records acceptance
@@ -21,7 +24,7 @@ proposed → open → claimed → submitted → in_review → done
 | Endpoint                             | Purpose                                                                        |
 | ------------------------------------ | ------------------------------------------------------------------------------ |
 | `POST /api/admin/posts/:id/promote`  | Create a Project Topic from a visible idea                                     |
-| `GET /api/projects/:id/tasks`        | Public list for an active Project Topic                                        |
+| `GET /api/projects/:id/tasks`        | Authenticated list for an active Project Topic                                 |
 | `GET /api/tasks/:id`                 | Task and a page of artifacts                                                   |
 | `POST /api/projects/:id/tasks`       | Propose a task                                                                 |
 | `POST /api/admin/projects/:id/tasks` | Create an open task                                                            |

@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
-import { getAccount } from '../../../lib/account';
+import { requireContentAccount } from '../../../lib/content-account';
 import { readCommunity } from '../../../lib/community-read';
 import { queryPath, type Post, type Topic } from '../../../lib/community-types';
 import { PostComposer } from '../../../components/community/mutations';
@@ -19,13 +18,11 @@ function ReplyList({
   posts,
   rootId,
   path,
-  signedIn,
   admin,
 }: {
   posts: Post[];
   rootId: string;
   path: string;
-  signedIn: boolean;
   admin: boolean;
 }) {
   const ids = new Set(posts.map((post) => post.id));
@@ -64,17 +61,15 @@ function ReplyList({
                     </Link>
                   </p>
                 )}
-              {signedIn && (
-                <details className="community-details">
-                  <summary>回复 @{post.author.handle}</summary>
-                  <PostComposer
-                    path={`/posts/${encodeURIComponent(post.id)}/replies`}
-                    reply
-                    signedIn
-                    returnTo={path}
-                  />
-                </details>
-              )}
+              <details className="community-details">
+                <summary>回复 @{post.author.handle}</summary>
+                <PostComposer
+                  path={`/posts/${encodeURIComponent(post.id)}/replies`}
+                  reply
+                  signedIn
+                  returnTo={path}
+                />
+              </details>
             </PostCard>
             {list(post.id, depth + 1)}
           </li>
@@ -92,40 +87,38 @@ export default async function Thread({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ cursor?: string | string[] }>;
 }) {
-  const [{ id }, { cursor }, requestHeaders] = await Promise.all([
+  const [{ id }, { cursor }, { cookies, profile }] = await Promise.all([
     params,
     searchParams,
-    headers(),
+    requireContentAccount(),
   ]);
   const path = `/posts/${encodeURIComponent(id)}`;
-  const [result, account] = await Promise.all([
+  const result =
     typeof cursor === 'object'
       ? { status: 'invalid' as const }
-      : readCommunity<{
+      : await readCommunity<{
           post: Post;
           replies: Post[];
           nextCursor: string | null;
-        }>(queryPath(`/api${path}`, { cursor })),
-    getAccount(requestHeaders.get('cookie')),
-  ]);
+        }>(queryPath(`/api${path}`, { cursor }), cookies);
   if (result.status === 'not-found') notFound();
   if (result.status !== 'ok')
     return (
-      <CommunityPage page="topics" title="讨论">
+      <CommunityPage page="topics" title="讨论" signedIn>
         <ReadProblem status={result.status} reset={path} />
       </CommunityPage>
     );
   const { post, replies, nextCursor } = result.data;
-  const signedIn = account.status === 'signed-in';
-  const admin = signedIn && account.profile.role === 'admin';
+  const admin = profile.role === 'admin';
   const topic =
     admin && post.kind === 'idea'
       ? await readCommunity<{ topic: Topic }>(
           `/api/topics/${encodeURIComponent(post.topicId)}`,
+          cookies,
         )
       : null;
   return (
-    <CommunityPage page="topics" title="讨论">
+    <CommunityPage page="topics" title="讨论" signedIn>
       <nav className="community-actions" aria-label="当前位置">
         <Link href={`/topics/${encodeURIComponent(post.topicSlug)}`}>
           返回 Topic
@@ -144,12 +137,7 @@ export default async function Thread({
       )}
       <section className="community-section">
         <h2>回复帖子</h2>
-        <PostComposer
-          path={`${path}/replies`}
-          reply
-          signedIn={signedIn}
-          returnTo={path}
-        />
+        <PostComposer path={`${path}/replies`} reply signedIn returnTo={path} />
       </section>
       <section className="community-section">
         <h2>回复</h2>
@@ -158,7 +146,6 @@ export default async function Thread({
             posts={replies}
             rootId={post.id}
             path={path}
-            signedIn={signedIn}
             admin={admin}
           />
         ) : (

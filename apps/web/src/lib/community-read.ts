@@ -7,12 +7,13 @@ export type ReadResult<T> =
 
 export async function readCommunity<T>(
   path: string,
-  cookies?: string | null,
+  cookies: string | null,
 ): Promise<ReadResult<T>> {
   try {
-    const cookie = sessionCookies(cookies ?? null);
+    const cookie = sessionCookies(cookies);
+    if (!cookie) return { status: 'denied' };
     const response = await internalApiRequest(path, {
-      headers: cookie ? { cookie } : {},
+      headers: { cookie },
     });
     if (response.ok)
       return { status: 'ok', data: (await response.json()) as T };

@@ -66,6 +66,14 @@ it('opens human and Agent accounts through the browser with GitHub disabled', as
     await participant
       .getByRole('heading', { name: 'Local Browser User' })
       .waitFor();
+    await participant.goto(`${origin}/topics/daily-inspiration`);
+    await participant
+      .getByRole('heading', { name: 'Daily Inspiration' })
+      .waitFor();
+    await participant.goto(`${origin}/topics/fixture-project`);
+    await participant
+      .getByRole('heading', { name: 'Example Project' })
+      .waitFor();
     await participant.goto(`${origin}/admin`);
     expect(
       await participant.getByRole('form', { name: '开通普通账户' }).count(),

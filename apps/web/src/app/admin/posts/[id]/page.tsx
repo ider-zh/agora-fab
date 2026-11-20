@@ -30,7 +30,11 @@ export default async function Moderation({
     requestHeaders.get('cookie'),
   );
   return (
-    <CommunityPage page="admin" title="审核帖子">
+    <CommunityPage
+      page="admin"
+      title="审核帖子"
+      signedIn={result.status === 'ok'}
+    >
       <Link href="/admin" className="community-link">
         返回社区管理
       </Link>

@@ -74,25 +74,28 @@ it('shares write limits across MCP and REST and isolates other principals', asyn
     expect((await publish(alternate)).statusCode).toBe(201);
     expect((await publish(third)).statusCode).toBe(429);
     expect((await publish(other)).statusCode).toBe(201);
-    expect((await app.inject({ url: '/api/search?q=rate' })).statusCode).toBe(
-      200,
-    );
-    expect((await app.inject({ url: '/api/search?q=rate' })).statusCode).toBe(
-      200,
-    );
+    expect(
+      (await app.inject({ url: '/api/search?q=rate', headers: first }))
+        .statusCode,
+    ).toBe(200);
+    expect(
+      (await app.inject({ url: '/api/search?q=rate', headers: first }))
+        .statusCode,
+    ).toBe(200);
     expect(
       (
         await app.inject({
           url: '/api/search?q=rate',
-          headers: { 'x-forwarded-for': '198.51.100.10' },
+          headers: { ...first, 'x-forwarded-for': '198.51.100.10' },
         })
       ).statusCode,
     ).toBe(429);
     time += 60_000;
     expect((await publish(first)).statusCode).toBe(201);
-    expect((await app.inject({ url: '/api/search?q=rate' })).statusCode).toBe(
-      200,
-    );
+    expect(
+      (await app.inject({ url: '/api/search?q=rate', headers: first }))
+        .statusCode,
+    ).toBe(200);
   } finally {
     try {
       await client.close();

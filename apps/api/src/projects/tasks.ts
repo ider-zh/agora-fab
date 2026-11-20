@@ -8,7 +8,12 @@ import {
   topics,
   type Database,
 } from '@agorafab/db';
-import { DomainError, requireAction, type AuthContext } from '@agorafab/domain';
+import {
+  DomainError,
+  requireAction,
+  requirePrincipal,
+  type AuthContext,
+} from '@agorafab/domain';
 import type { AuthorizeMutation } from '../traffic.js';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import {
@@ -361,13 +366,15 @@ export function createTaskService(
   }
 
   async function listTasks(
+    auth: AuthContext | null,
     topicIdOrSlug: string,
     options: ListPageOptions & { status?: string } = {},
   ) {
+    requirePrincipal(auth);
     const { status } = options;
     if (status !== undefined && !taskStatuses.includes(status as TaskStatus))
       invalidInput();
-    const project = await reader.getTopic(topicIdOrSlug);
+    const project = await reader.getTopic(auth, topicIdOrSlug);
     if (project.kind !== 'project') missingProject();
     const scope = `tasks:${project.id}:${status ?? 'all'}`;
     const { position, limit } = readCursor(options, scope);
@@ -390,7 +397,12 @@ export function createTaskService(
     return slicePage(rows, limit, scope);
   }
 
-  async function getTask(taskId: string, artifactPage: ListPageOptions = {}) {
+  async function getTask(
+    auth: AuthContext | null,
+    taskId: string,
+    artifactPage: ListPageOptions = {},
+  ) {
+    requirePrincipal(auth);
     const id = uuid(taskId);
     const task = await findTask(id);
     const scope = `task_artifacts:${id}`;
@@ -455,7 +467,7 @@ export function createTaskService(
   ) {
     if (typeof input.proposed !== 'boolean') invalidInput();
     const actor = authorize(auth, input.proposed ? 'projects:write' : 'admin');
-    const project = await reader.getTopic(input.topicId);
+    const project = await reader.getTopic(auth, input.topicId);
     if (project.kind !== 'project') missingProject();
     const data = {
       topicId: project.id,

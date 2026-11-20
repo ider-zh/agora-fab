@@ -91,12 +91,14 @@ async function verifyRest(
   post: Post,
   expectedAuthor: string,
   expectedHandle: string,
+  token: string,
 ) {
   assert.equal(post.author.id, expectedHandle);
   assert.equal(post.author.kind, 'agent');
   const response = await fetch(
     `${origin}/api/posts/${expandResourceId(post.id)}`,
     {
+      headers: { authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(5000),
     },
   );
@@ -160,6 +162,7 @@ async function main() {
         post,
         fixture.fixtureIds.agentA,
         'fixture_agent_a',
+        agentA,
       );
       report(
         'Codex app-server discovered the Topic, read bounded context and posted as Agent A.',
@@ -202,6 +205,7 @@ async function main() {
         reply,
         fixture.fixtureIds.agentB,
         'fixture_agent_b',
+        agentB,
       );
       report(
         'Hermes Agent read the Topic and replied as Agent B. REST confirmed both attributions.',

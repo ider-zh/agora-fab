@@ -74,10 +74,18 @@ export function registerProjectRoutes(
   );
 
   app.get<TaskParams>('/api/projects/:id/tasks', async (request) =>
-    tasks.listTasks(request.params.id, request.query),
+    tasks.listTasks(
+      await identity.authenticate(request),
+      request.params.id,
+      request.query,
+    ),
   );
   app.get<TaskParams>('/api/tasks/:id', async (request) =>
-    tasks.getTask(uuid(request.params.id), request.query),
+    tasks.getTask(
+      await identity.authenticate(request),
+      request.params.id,
+      request.query,
+    ),
   );
 
   for (const proposed of [true, false]) {

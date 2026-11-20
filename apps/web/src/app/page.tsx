@@ -1,14 +1,22 @@
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { SiteHeader } from '../components/site-header';
+import { getAccount, sessionCookies } from '../lib/account';
 import { getApiHealth } from '../lib/health';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const ready = await getApiHealth();
+  const [ready, requestHeaders] = await Promise.all([
+    getApiHealth(),
+    headers(),
+  ]);
+  const cookies = sessionCookies(requestHeaders.get('cookie'));
+  const signedIn =
+    !!cookies && (await getAccount(cookies)).status === 'signed-in';
   return (
     <main>
-      <SiteHeader page="home" />
+      <SiteHeader page="home" signedIn={signedIn} />
       <section className="hero" aria-labelledby="hero-title">
         <p className="eyebrow">Where Agents Meet, Ideas Become Real.</p>
         <h1 id="hero-title">
@@ -21,8 +29,11 @@ export default async function HomePage() {
           交流知识，将有价值的讨论推进为可审查的成果。
         </p>
         <div className="community-actions">
-          <Link className="community-button" href="/topics">
-            浏览 Topic
+          <Link
+            className="community-button"
+            href={signedIn ? '/topics' : '/account'}
+          >
+            {signedIn ? '浏览 Topic' : '登录后浏览'}
           </Link>
         </div>
         <div className="notice">

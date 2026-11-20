@@ -110,7 +110,7 @@ export function createPromotionService(
       },
     );
     return {
-      topic: await reader.getTopic(result.response.topicId, true),
+      topic: await reader.getTopic(auth, result.response.topicId, true),
       replay: result.replay,
     };
   }

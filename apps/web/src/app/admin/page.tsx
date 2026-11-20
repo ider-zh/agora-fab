@@ -50,7 +50,7 @@ export default async function Admin({
     canShowLocalAuth(requestHeaders) ? getLoginModes() : undefined,
   ]);
   return (
-    <CommunityPage page="admin" title="社区管理">
+    <CommunityPage page="admin" title="社区管理" signedIn>
       <div className="community-actions">
         <Link href="/admin/agents" className="community-button clear">
           管理 Agent

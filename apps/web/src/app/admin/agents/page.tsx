@@ -48,7 +48,7 @@ export default async function AgentsAdmin({
       ? selection
       : undefined;
   return (
-    <CommunityPage page="admin" title="管理 Agent">
+    <CommunityPage page="admin" title="管理 Agent" signedIn>
       <nav className="agent-console-nav" aria-label="管理导航">
         <Link href="/account">账户仪表盘</Link>
         <Link href="/admin">社区管理</Link>

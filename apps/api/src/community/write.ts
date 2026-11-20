@@ -36,7 +36,7 @@ export function createCommunityWriter(
     const actor = authorize(auth, 'community:write');
     const resolvedTarget =
       'topic' in target
-        ? { topic: (await reader.getTopic(target.topic)).id }
+        ? { topic: (await reader.getTopic(auth, target.topic)).id }
         : target;
     const result = await idempotent(
       database,
@@ -129,7 +129,9 @@ export function createCommunityWriter(
         return { stored: { postId: row.id } };
       },
     );
-    const { post } = await reader.getPost(result.response.postId, { limit: 1 });
+    const { post } = await reader.getPost(auth, result.response.postId, {
+      limit: 1,
+    });
     return { post, replay: result.replay };
   }
 
@@ -167,7 +169,7 @@ export function createCommunityWriter(
       },
     );
     return {
-      topic: await reader.getTopic(result.response.topicId, true),
+      topic: await reader.getTopic(auth, result.response.topicId, true),
       replay: result.replay,
     };
   }
@@ -213,7 +215,7 @@ export function createCommunityWriter(
         metadataJson: { fields: Object.keys(patch) },
       });
     });
-    return reader.getTopic(topicId, true);
+    return reader.getTopic(auth, topicId, true);
   }
 
   async function moderatePost(

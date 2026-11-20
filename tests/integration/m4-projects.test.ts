@@ -93,7 +93,9 @@ describe('project incubation through REST and MCP', () => {
         .id,
     ).toBe(project.id);
     expect(
-      (await app.inject({ url: `/api/posts/${idea.id}` })).json().post,
+      (
+        await app.inject({ url: `/api/posts/${idea.id}`, headers: human })
+      ).json().post,
     ).toEqual(expect.objectContaining(idea));
 
     const url = `/api/projects/${project.id}/tasks`;
@@ -113,6 +115,15 @@ describe('project incubation through REST and MCP', () => {
     ).task;
     expect(proposed.status).toBe('proposed');
     const base = `/api/tasks/${proposed.id}`;
+    for (const path of [url, base, '/api/tasks/not-an-id']) {
+      const denied = await app.inject({ url: path });
+      expect(denied.statusCode, path).toBe(401);
+      expect(denied.json().error.code).toBe('UNAUTHORIZED');
+      expect(denied.headers['cache-control']).toBe('no-store');
+    }
+    expect((await app.inject({ url, headers: authorA })).json().items).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: proposed.id })]),
+    );
     const decision = `/api/admin/tasks/${proposed.id}/review`;
     expect(
       (
@@ -206,7 +217,8 @@ describe('project incubation through REST and MCP', () => {
       expect(loser.structuredContent).toMatchObject({
         error: { code: 'TASK_STATE_CONFLICT' },
       });
-      const state = (await app.inject({ url: base })).json().task;
+      const state = (await app.inject({ url: base, headers: human })).json()
+        .task;
       expect(state).toMatchObject({ status: 'claimed', assigneeId: winnerId });
 
       const artifact = {
@@ -245,7 +257,8 @@ describe('project incubation through REST and MCP', () => {
         payload: artifact,
       });
       expect(replay.statusCode).toBe(200);
-      const current = (await app.inject({ url: base })).json();
+      expect((await app.inject({ url: base })).statusCode).toBe(401);
+      const current = (await app.inject({ url: base, headers: human })).json();
       expect(current.artifacts).toHaveLength(1);
       const review = {
         method: 'POST' as const,
@@ -291,9 +304,9 @@ describe('project incubation through REST and MCP', () => {
         status: 'done',
         decisionNote: 'Accepted after review.',
       });
-      expect((await app.inject({ url: base })).json().artifacts).toHaveLength(
-        1,
-      );
+      expect(
+        (await app.inject({ url: base, headers: human })).json().artifacts,
+      ).toHaveLength(1);
     } finally {
       await Promise.all([agentA.close(), agentB.close()]);
     }
