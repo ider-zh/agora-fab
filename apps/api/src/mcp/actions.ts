@@ -159,6 +159,10 @@ export function createMcpActions(
     },
     get_notifications: (options) =>
       inbox.list(identity, { ...options, unread: options.unread ?? true }),
+    async mark_notification_read({ notificationId }) {
+      await inbox.acknowledge(identity, uuid(expandResourceId(notificationId)));
+      return { read: true };
+    },
     projects: tasks
       ? {
           list_tasks: ({ topicId, ...page }) =>

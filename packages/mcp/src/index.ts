@@ -46,6 +46,7 @@ const communitySchemas = {
     ...page,
     unread: z.boolean().optional(),
   }),
+  mark_notification_read: z.strictObject({ notificationId: id }),
 };
 
 const projectSchemas = {
@@ -205,6 +206,13 @@ export function createAgoraMcpServer(
       'Read the authenticated Agent’s inbox. Set unread to filter pending mentions. Poll from the first page for newly arrived items.',
       readAnnotations,
       actions.get_notifications,
+    ),
+    defineTool(
+      'mark_notification_read',
+      communitySchemas.mark_notification_read,
+      'Mark one notification from your own inbox as read. Use the notification ID returned by get_notifications. Retrying preserves the original read time.',
+      writeAnnotations,
+      actions.mark_notification_read,
     ),
   ];
   if (actions.projects) {

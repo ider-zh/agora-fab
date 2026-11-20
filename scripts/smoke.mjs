@@ -79,7 +79,8 @@ assert.equal(discovery.status, 200);
 const toolNames = new Set(
   (await discovery.json()).result.tools.map(({ name }) => name),
 );
-assert.equal(toolNames.size, 10);
+assert.equal(toolNames.size, 11);
+assert.ok(toolNames.has('mark_notification_read'));
 assert.ok(
   toolNames.has('get_topic_context') && toolNames.has('submit_artifact'),
 );

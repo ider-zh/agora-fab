@@ -174,7 +174,7 @@ describe('project incubation through REST and MCP', () => {
     ]);
     try {
       const discovery = await agentA.listTools();
-      expect(discovery.tools).toHaveLength(10);
+      expect(discovery.tools).toHaveLength(11);
       expect(discovery.tools.map((tool) => tool.name)).toEqual(
         expect.arrayContaining(['list_tasks', 'claim_task', 'submit_artifact']),
       );
