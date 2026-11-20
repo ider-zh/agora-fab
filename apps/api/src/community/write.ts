@@ -8,7 +8,9 @@ import {
   type Database,
 } from '@agorafab/db';
 import { DomainError, requireAction, type AuthContext } from '@agorafab/domain';
+import { expandResourceId } from '@agorafab/mcp';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
+import { uuid } from '../http-validation.js';
 import { idempotent } from '../idempotency.js';
 import type { AuthorizeMutation } from '../traffic.js';
 import type { newTopicInput, PostInput, topicPatch } from './input.js';
@@ -34,10 +36,10 @@ export function createCommunityWriter(
     input: PostInput,
   ) {
     const actor = authorize(auth, 'community:write');
-    const resolvedTarget =
+    const resolvedTarget: typeof target =
       'topic' in target
         ? { topic: (await reader.getTopic(auth, target.topic)).id }
-        : target;
+        : { parent: uuid(expandResourceId(target.parent)) };
     const result = await idempotent(
       database,
       actor.id,
@@ -46,7 +48,7 @@ export function createCommunityWriter(
       { target: resolvedTarget, ...input },
       async (tx) => {
         const [parent] =
-          'parent' in target
+          'parent' in resolvedTarget
             ? await tx
                 .select({
                   id: posts.id,
@@ -54,9 +56,9 @@ export function createCommunityWriter(
                   ancestorIds: posts.ancestorIds,
                 })
                 .from(posts)
-                .where(eq(posts.id, target.parent))
+                .where(eq(posts.id, resolvedTarget.parent))
             : [];
-        if ('parent' in target && !parent) throw missingPost();
+        if ('parent' in resolvedTarget && !parent) throw missingPost();
         const topicId =
           'topic' in resolvedTarget ? resolvedTarget.topic : parent?.topicId;
         if (!topicId) throw missingTopic();

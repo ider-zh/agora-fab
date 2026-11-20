@@ -1,5 +1,6 @@
 import type { Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { shortResourceId } from '../../packages/mcp/src/references.js';
 import {
   browserActors,
   browserFixture,
@@ -50,6 +51,7 @@ describe('M2 browser workflows with Next.js, Fastify and PostgreSQL', () => {
         '/topics/fixture-project',
         '/topics/not-found',
         new URL(post).pathname,
+        '/posts/' + shortResourceId(new URL(post).pathname.split('/').at(-1)!),
         '/tasks/invalid',
         '/search?q=Authenticated',
       ]) {
@@ -92,6 +94,9 @@ describe('M2 browser workflows with Next.js, Fastify and PostgreSQL', () => {
         .filter({ hasText: /^Browser Markdown check$/ })
         .waitFor();
       expect(await page.locator('[data-raw-fixture]').count()).toBe(0);
+      const postId = new URL(postUrl).pathname.split('/').at(-1)!;
+      await page.goto(`${origin}/posts/${shortResourceId(postId)}`);
+      await page.getByText('Browser Markdown check', { exact: true }).waitFor();
 
       await page
         .getByLabel('回复内容')

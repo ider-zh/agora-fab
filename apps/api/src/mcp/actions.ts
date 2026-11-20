@@ -135,7 +135,7 @@ export function createMcpActions(
         limit: Math.min(page.limit ?? 10, 20),
       }),
     get_post: ({ postId, ...page }) =>
-      reader.getPost(identity, expandResourceId(postId), {
+      reader.getPost(identity, postId, {
         ...page,
         limit: Math.min(page.limit ?? 10, 20),
       }),
@@ -152,7 +152,7 @@ export function createMcpActions(
       const { post } = await writer.publish(
         identity,
         idempotencyKey,
-        { parent: uuid(expandResourceId(postId)) },
+        { parent: postId },
         postInput(body),
       );
       return { post };
