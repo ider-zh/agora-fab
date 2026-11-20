@@ -165,6 +165,7 @@ describe('official SDK clients over Streamable HTTP', () => {
             'create_post',
             'reply_post',
             'get_notifications',
+            'mark_notification_read',
           ]),
         );
         for (const [name, args] of [
@@ -282,6 +283,88 @@ describe('official SDK clients over Streamable HTTP', () => {
           ?.replies,
       ).toEqual([expect.objectContaining({ id: reply.id })]);
     });
+  });
+
+  it('marks only the Agent’s own mention as read, preserving its timestamp on retry', async () => {
+    const a = fixture.fixtureIds.agentA;
+    const b = fixture.fixtureIds.agentB;
+    const owner = await fixture.issue(a, [
+      'notifications:read',
+      'notifications:write',
+    ]);
+    const readonly = await fixture.issue(a, ['notifications:read']);
+    const other = await fixture.issue(b, [
+      'community:write',
+      'notifications:write',
+    ]);
+    const post = await withClient(other, async (client) =>
+      expectPost(
+        await tool(client, 'create_post', {
+          topicId,
+          bodyMd: 'Read receipt for @fixture_agent_a',
+          idempotencyKey: randomUUID(),
+        }),
+        'fixture_agent_b',
+      ),
+    );
+    const notification = await withClient(owner, async (client) => {
+      const inbox = await tool(client, 'get_notifications');
+      const items = inbox.structuredContent?.items as {
+        id: string;
+        postId: string;
+        readAt: string | null;
+      }[];
+      const note = items.find((item) => item.postId === post.id);
+      expect(note).toMatchObject({
+        id: expect.stringMatching(/^~/),
+        readAt: null,
+      });
+      return note!;
+    });
+    const input = { notificationId: notification.id };
+    await withClient(readonly, async (client) =>
+      expectToolError(
+        await tool(client, 'mark_notification_read', input),
+        'INSUFFICIENT_SCOPE',
+      ),
+    );
+    await withClient(other, async (client) =>
+      expectToolError(
+        await tool(client, 'mark_notification_read', input),
+        'NOTIFICATION_NOT_FOUND',
+      ),
+    );
+    const canonical = expandResourceId(notification.id);
+    const load = async () => {
+      const r = await fixture.app.inject({
+        url: '/api/me/notifications',
+        headers: owner,
+      });
+      expect(r.statusCode).toBe(200);
+      return r
+        .json<{ items: { id: string; readAt: string | null }[] }>()
+        .items.find((item) => item.id === canonical)!;
+    };
+    await withClient(owner, async (client) => {
+      expect(
+        (await tool(client, 'mark_notification_read', input)).structuredContent,
+      ).toEqual({ read: true });
+    });
+    const marked = await load();
+    expect(marked.readAt).toEqual(expect.any(String));
+    await withClient(owner, async (client) => {
+      expect(
+        (
+          await tool(client, 'mark_notification_read', {
+            notificationId: canonical,
+          })
+        ).structuredContent,
+      ).toEqual({ read: true });
+      expect(
+        (await tool(client, 'get_notifications')).structuredContent?.items,
+      ).not.toContainEqual(expect.objectContaining({ id: notification.id }));
+    });
+    expect(await load()).toEqual(marked);
   });
 
   it('checks scopes and revocation at each call', async () => {

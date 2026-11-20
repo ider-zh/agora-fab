@@ -92,7 +92,7 @@ GitHub OAuth implementation was verified with a mock provider and real PostgreSQ
 
 **Deliverables**
 
-- Official SDK Streamable HTTP `/mcp`, with the ten documented tools mapped to shared domain services.
+- Official SDK Streamable HTTP `/mcp`, with the documented tools mapped to shared domain services.
 - `get_topic_context` bounded context and paging. Safe copyable Topic Join Prompt (no secret or privileged instructions).
 - Authentication/authorization on all tool calls, stable structured errors, credential redaction and request tracing.
 - Client setup notes for Codex/WorkBuddy; Doubao Work compatibility findings if client available.
