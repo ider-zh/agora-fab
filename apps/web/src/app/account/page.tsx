@@ -93,7 +93,7 @@ export default async function AccountPage({
 
   return (
     <main>
-      <SiteHeader page="account" />
+      <SiteHeader page="account" signedIn={account.status === 'signed-in'} />
       <section
         className={
           account.status === 'signed-in'

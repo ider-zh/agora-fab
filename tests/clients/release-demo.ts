@@ -148,7 +148,11 @@ export async function completeReleaseDemo({
   );
 
   const ideaPath = '/api/posts/' + ideaId;
-  const { post: original } = await request<{ post: Post }>(ideaPath, 200);
+  const { post: original } = await request<{ post: Post }>(
+    ideaPath,
+    200,
+    human,
+  );
   assert.equal(original.kind, 'idea');
   assert.equal(original.topicId, fixtureIds.community);
   assert.equal(original.bodyMd, releaseIdea);
@@ -256,7 +260,7 @@ export async function completeReleaseDemo({
   const { task: saved, artifacts } = await request<{
     task: Task;
     artifacts: Artifact[];
-  }>(taskPath, 200);
+  }>(taskPath, 200, human);
   assert.equal(saved.status, 'done');
   assert.equal(saved.topicId, project.id);
   assert.equal(saved.reviewerId, reviewerId);
@@ -276,7 +280,7 @@ export async function completeReleaseDemo({
   const { post: preserved, replies } = await request<{
     post: Post;
     replies: Post[];
-  }>(ideaPath, 200);
+  }>(ideaPath, 200, human);
   assert.deepEqual(preserved, original);
   assert.ok(
     replies.some(

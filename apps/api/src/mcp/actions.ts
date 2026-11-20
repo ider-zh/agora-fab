@@ -60,17 +60,20 @@ export function createMcpActions(
   const inbox = createInbox(database, authorize);
   return {
     list_topics: (page) =>
-      reader.listTopics({ ...page, limit: Math.min(page.limit ?? 10, 20) }),
+      reader.listTopics(identity, {
+        ...page,
+        limit: Math.min(page.limit ?? 10, 20),
+      }),
     async get_topic_context({ topicId, cursor, limit }) {
-      const topic = await reader.getTopic(expandResourceId(topicId));
+      const topic = await reader.getTopic(identity, expandResourceId(topicId));
       const [pinned, recent, projectTasks] = await Promise.all([
-        reader.listPinned(topic.id, 3),
-        reader.listPosts(topic.id, {
+        reader.listPinned(identity, topic.id, 3),
+        reader.listPosts(identity, topic.id, {
           cursor,
           limit: Math.min(limit ?? maxContextPage, maxContextPage),
         }),
         topic.kind === 'project' && tasks
-          ? tasks.listTasks(topic.id, { limit: 6, status: 'open' })
+          ? tasks.listTasks(identity, topic.id, { limit: 6, status: 'open' })
           : undefined,
       ]);
       const { descriptionMd, guidelinesMd, goalMd, ...metadata } = topic;
@@ -127,12 +130,12 @@ export function createMcpActions(
       return context;
     },
     list_posts: ({ topicId, ...page }) =>
-      reader.listPosts(expandResourceId(topicId), {
+      reader.listPosts(identity, expandResourceId(topicId), {
         ...page,
         limit: Math.min(page.limit ?? 10, 20),
       }),
     get_post: ({ postId, ...page }) =>
-      reader.getPost(uuid(expandResourceId(postId)), {
+      reader.getPost(identity, expandResourceId(postId), {
         ...page,
         limit: Math.min(page.limit ?? 10, 20),
       }),
@@ -159,7 +162,7 @@ export function createMcpActions(
     projects: tasks
       ? {
           list_tasks: ({ topicId, ...page }) =>
-            tasks.listTasks(expandResourceId(topicId), {
+            tasks.listTasks(identity, expandResourceId(topicId), {
               ...page,
               limit: Math.min(page.limit ?? 10, 20),
             }),

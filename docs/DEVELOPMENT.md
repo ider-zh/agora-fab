@@ -100,7 +100,7 @@ session protections and the documented authorization boundary.
 Web: `/` SSR status page, `/account`, and `/health` Web/API/DB health. API: `/health/live` proves
 the process is serving; `/health/ready` executes a DB query. Readiness proves DB
 connectivity. The migration job gates initial startup. The smoke test also checks
-the public fixture Topic and rejects an unauthenticated post.
+that signed-out requests cannot read fixture Topics or publish posts.
 
 Fixtures are deliberately a separate command/profile and never run automatically
 when normal services start. The seed service always targets fixture mode; never
