@@ -91,6 +91,7 @@ describe('official SDK clients over Streamable HTTP', () => {
         await tool(client, 'list_topics', { limit: 1, view: 'summary' })
       ).structuredContent!;
       const [item] = small.items as { id: string; slug: string }[];
+      if (!item) throw new Error('Expected a Topic summary.');
       expect(item.id).toBe(item.slug);
       expect(Object.keys(item).sort()).toEqual(['id', 'kind', 'slug', 'title']);
       expect(small.nextCursor).toBe(full.nextCursor);

@@ -200,12 +200,12 @@ export function createCommunityReader(database: Database) {
       sql`, `,
     )}]`;
     const result = await db.execute<{
-      post_id: string;
-      reply_count: number;
-      last_reply_at: string;
+      postId: string;
+      replyCount: number;
+      lastReplyAt: string;
     }>(sql`
-      select activity.post_id, count(*)::int as reply_count,
-        ${cursorTimestamp(sql`max(${posts.createdAt})`)} as last_reply_at
+      select activity.post_id as "postId", count(*)::int as "replyCount",
+        ${cursorTimestamp(sql`max(${posts.createdAt})`)} as "lastReplyAt"
       from ${posts}
       inner join ${topics} on ${topics.id} = ${posts.topicId}
       cross join lateral unnest(${posts.ancestorIds}) as activity(post_id)

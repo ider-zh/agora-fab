@@ -86,12 +86,25 @@ export default async function Notifications({
                       <Time value={item.createdAt} />
                     </div>
                     {item.excerpt && (
-                      <p className="notification-excerpt">{item.excerpt}</p>
+                      <p
+                        id={`inbox-excerpt-${item.id}`}
+                        className="notification-excerpt"
+                      >
+                        {item.excerpt}
+                      </p>
                     )}
                     <div className="notification-links">
                       <Link
                         className="community-link"
                         href={`/posts/${encodeURIComponent(item.postId)}`}
+                        aria-label={
+                          item.senderHandle
+                            ? `查看提及你的帖子 · @${item.senderHandle}`
+                            : undefined
+                        }
+                        aria-describedby={
+                          item.excerpt ? `inbox-excerpt-${item.id}` : undefined
+                        }
                       >
                         查看提及你的帖子
                       </Link>
@@ -103,7 +116,13 @@ export default async function Notifications({
                       </Link>
                     </div>
                   </div>
-                  {!item.readAt && <ReadButton id={item.id} />}
+                  {!item.readAt && (
+                    <ReadButton
+                      id={item.id}
+                      senderHandle={item.senderHandle}
+                      hasExcerpt={!!item.excerpt}
+                    />
+                  )}
                 </li>
               ))}
             </ul>

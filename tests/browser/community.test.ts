@@ -128,9 +128,30 @@ describe('M2 browser workflows with Next.js, Fastify and PostgreSQL', () => {
         .waitFor();
       await screenshot(page, 'm2-browser-mobile-thread');
 
+      const sender = await browser.newPage();
+      try {
+        await signIn(sender, origin, 'admin');
+        await sender.goto(`${origin}/topics/daily-inspiration`);
+        await publish(
+          sender,
+          `Second sender @gh_${browserActors.participant.id}`,
+        );
+      } finally {
+        await sender.close();
+      }
       await page.goto(`${origin}/notifications`);
-      const mention = page.getByRole('link', { name: '查看提及你的帖子' });
+      const mention = page.getByRole('link', {
+        name: `查看提及你的帖子 · @gh_${browserActors.participant.id}`,
+      });
       await mention.waitFor();
+      const otherMention = page.getByRole('link', {
+        name: `查看提及你的帖子 · @gh_${browserActors.admin.id}`,
+      });
+      await otherMention.waitFor();
+      const otherExcerpt = await otherMention.getAttribute('aria-describedby');
+      expect(
+        await page.locator(`[id="${otherExcerpt}"]`).textContent(),
+      ).toContain('Second sender');
       await page
         .getByText(`@gh_${browserActors.participant.id}`, { exact: true })
         .waitFor();
@@ -141,7 +162,7 @@ describe('M2 browser workflows with Next.js, Fastify and PostgreSQL', () => {
       const mentionPath = await mention.getAttribute('href');
       expect(mentionPath).toBe(new URL(postUrl).pathname);
       const markRead = page.getByRole('button', {
-        name: '标为已读',
+        name: `标为已读 · @gh_${browserActors.participant.id}`,
         exact: true,
       });
       await markRead.click();

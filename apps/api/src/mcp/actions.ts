@@ -31,11 +31,11 @@ function excerpt(value: string, maxBytes: number) {
 
 type CommunityReader = ReturnType<typeof createCommunityReader>;
 type Post = Awaited<ReturnType<CommunityReader['getPost']>>['post'];
+type ReplyActivity = Awaited<
+  ReturnType<CommunityReader['listReplyActivity']>
+>[number];
 
-function previewPost(
-  post: Post,
-  activity?: { reply_count: number; last_reply_at: string },
-) {
+function previewPost(post: Post, activity?: ReplyActivity) {
   const bodyMd = excerpt(post.bodyMd, 1152);
   return {
     id: post.id,
@@ -49,8 +49,8 @@ function previewPost(
     },
     bodyMd,
     bodyTruncated: bodyMd !== post.bodyMd,
-    replyCount: activity?.reply_count ?? 0,
-    lastReplyAt: activity?.last_reply_at ?? null,
+    replyCount: activity?.replyCount ?? 0,
+    lastReplyAt: activity?.lastReplyAt ?? null,
   };
 }
 
@@ -123,7 +123,7 @@ export function createMcpActions(
       ];
       const activity = new Map(
         (await reader.listReplyActivity(identity, topic.id, postIds)).map(
-          (entry) => [entry.post_id, entry],
+          (entry) => [entry.postId, entry],
         ),
       );
       const preview = (post: Post) => previewPost(post, activity.get(post.id));

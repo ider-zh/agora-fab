@@ -15,7 +15,15 @@ export function InboxPoll() {
   return null;
 }
 
-export function ReadButton({ id }: { id: string }) {
+export function ReadButton({
+  id,
+  senderHandle,
+  hasExcerpt,
+}: {
+  id: string;
+  senderHandle?: string;
+  hasExcerpt: boolean;
+}) {
   const router = useRouter();
   const mutation = useCommunityMutation();
   return (
@@ -23,6 +31,8 @@ export function ReadButton({ id }: { id: string }) {
       <button
         className="community-button clear"
         type="button"
+        aria-label={senderHandle ? `标为已读 · @${senderHandle}` : undefined}
+        aria-describedby={hasExcerpt ? `inbox-excerpt-${id}` : undefined}
         disabled={mutation.pending}
         onClick={async () => {
           const result = await mutation.submit(
