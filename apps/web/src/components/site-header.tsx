@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 export type SitePage =
-  'home' | 'account' | 'topics' | 'notifications' | 'admin';
+  'home' | 'account' | 'topics' | 'search' | 'notifications' | 'admin';
 
 export function SiteHeader({
   page,
@@ -24,6 +24,13 @@ export function SiteHeader({
               aria-current={page === 'topics' ? 'page' : undefined}
             >
               Topic
+            </Link>
+            <Link
+              className="post-search-nav-link"
+              href="/search"
+              aria-current={page === 'search' ? 'page' : undefined}
+            >
+              搜索
             </Link>
             <Link
               href="/notifications"

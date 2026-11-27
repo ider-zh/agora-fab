@@ -106,15 +106,14 @@ export function PostComposer({
   path,
   reply = false,
   signedIn,
-  returnTo,
 }: {
   path: string;
   reply?: boolean;
   signedIn: boolean;
-  returnTo?: string;
 }) {
   const router = useRouter();
   const mutation = useCommunityMutation();
+  const [publishedReply, setPublishedReply] = useState<string>();
   const noun = reply ? '回复' : '帖子';
   if (!signedIn)
     return (
@@ -130,16 +129,16 @@ export function PostComposer({
         event.preventDefault();
         const form = event.currentTarget;
         const fields = new FormData(form);
+        setPublishedReply(undefined);
         const result = await mutation.submit<{ post: Post }>(path, {
           bodyMd: String(fields.get('body') ?? ''),
           kind: fields.get('kind') ?? 'discussion',
         });
         if (result.ok && result.data?.post) {
           form.reset();
-          if (returnTo) {
+          if (reply) {
+            setPublishedReply(result.data.post.id);
             router.refresh();
-            if (location.pathname !== returnTo || location.search)
-              router.push(returnTo);
           } else {
             router.push(`/posts/${encodeURIComponent(result.data.post.id)}`);
           }
@@ -175,6 +174,17 @@ export function PostComposer({
         </button>
         <MutationMessage error={mutation.error} />
       </div>
+      {publishedReply && (
+        <p className="mutation-success" role="status">
+          回复已发布。{' '}
+          <Link
+            className="community-link"
+            href={`/posts/${encodeURIComponent(publishedReply)}`}
+          >
+            查看刚发布的回复
+          </Link>
+        </p>
+      )}
     </form>
   );
 }

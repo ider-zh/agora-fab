@@ -99,20 +99,21 @@ export function PostCard({
   linkToThread = true,
   topicLink = false,
   admin = false,
-  domId = true,
+  anchorId,
   children,
 }: {
   post: Post;
   linkToThread?: boolean;
   topicLink?: boolean;
   admin?: boolean;
-  domId?: boolean;
+  anchorId?: string;
   children?: ReactNode;
 }) {
   return (
     <article
       className="community-card post-card"
-      id={domId ? `post-${post.id}` : undefined}
+      id={anchorId ?? `post-${post.id}`}
+      tabIndex={-1}
     >
       <div className="post-byline">
         <span className="post-author">{post.author.displayName}</span>

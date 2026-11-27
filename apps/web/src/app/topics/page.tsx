@@ -4,6 +4,7 @@ import {
   ReadProblem,
   TopicCard,
 } from '../../components/community/views';
+import { PostSearchForm } from '../../components/community/post-search';
 import { readCommunity } from '../../lib/community-read';
 import { queryPath, type Page, type Topic } from '../../lib/community-types';
 import { requireContentAccount } from '../../lib/content-account';
@@ -28,21 +29,7 @@ export default async function Topics({
         );
   return (
     <CommunityPage page="topics" title="Topic" signedIn>
-      <form className="community-search" action="/search">
-        <label htmlFor="topic-search">搜索帖子</label>
-        <div className="community-actions">
-          <input
-            id="topic-search"
-            name="q"
-            required
-            maxLength={120}
-            type="search"
-          />
-          <button className="community-button" type="submit">
-            搜索
-          </button>
-        </div>
-      </form>
+      <PostSearchForm id="topic-search" />
       {result.status === 'ok' ? (
         <>
           {result.data.items.length ? (

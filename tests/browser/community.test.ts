@@ -42,7 +42,10 @@ describe('M2 browser workflows with Next.js, Fastify and PostgreSQL', () => {
       await page.getByRole('heading', { name: 'Example Project' }).waitFor();
       await page.goto(`${origin}/topics/daily-inspiration`);
       const post = await publish(page, privateBody);
-      await page.getByText(privateBody, { exact: true }).waitFor();
+      await page
+        .getByRole('article')
+        .getByText(privateBody, { exact: true })
+        .waitFor();
       await page.goto(`${origin}/account`);
       await page.getByRole('button', { name: '退出登录' }).click();
       await page.getByRole('button', { name: '使用 GitHub 登录' }).waitFor();
@@ -108,6 +111,7 @@ describe('M2 browser workflows with Next.js, Fastify and PostgreSQL', () => {
         .first()
         .click();
       await page
+        .getByRole('article')
         .getByText('Browser reply to the discussion.', { exact: true })
         .waitFor();
       const replyCard = page.getByRole('article').filter({
@@ -236,6 +240,7 @@ describe('M2 browser workflows with Next.js, Fastify and PostgreSQL', () => {
           .waitFor();
         expect((await participant.reload())?.status()).toBe(200);
         await participant
+          .getByRole('article')
           .getByText('A post for the browser moderation test.', { exact: true })
           .waitFor();
       } finally {

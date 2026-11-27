@@ -50,14 +50,18 @@ export function registerCommunityRoutes(
       request.query,
     ),
   );
-  app.get<{ Querystring: ListPageOptions & { q: string } }>(
-    '/api/search',
-    async (request) => {
-      const auth = requirePrincipal(await identity.authenticate(request));
-      traffic.checkSearch(request.ip);
-      return reader.search(auth, request.query);
-    },
-  );
+  app.get<{
+    Querystring: ListPageOptions & {
+      q: string;
+      topic?: string;
+      thread?: string;
+    };
+  }>('/api/search', async (request) => {
+    const auth = requirePrincipal(await identity.authenticate(request));
+    traffic.checkSearch(request.ip);
+    verifiedObject(request.query, ['q', 'topic', 'thread', 'cursor', 'limit']);
+    return reader.search(auth, request.query);
+  });
 
   app.post<ReadParams>('/api/topics/:id/posts', async (request, reply) => {
     const auth = await identity.authenticateMutation(request);

@@ -4,6 +4,8 @@ import { requireContentAccount } from '../../../lib/content-account';
 import { readCommunity } from '../../../lib/community-read';
 import { queryPath, type Post, type Topic } from '../../../lib/community-types';
 import { PostComposer } from '../../../components/community/mutations';
+import { IndexedDiscussion } from '../../../components/community/discussion-index';
+import { PostSearchForm } from '../../../components/community/post-search';
 import { PromoteIdea } from '../../../components/community/project-controls';
 import {
   CommunityPage,
@@ -17,12 +19,10 @@ export const dynamic = 'force-dynamic';
 function ReplyList({
   posts,
   rootId,
-  path,
   admin,
 }: {
   posts: Post[];
   rootId: string;
-  path: string;
   admin: boolean;
 }) {
   const ids = new Set(posts.map((post) => post.id));
@@ -67,7 +67,6 @@ function ReplyList({
                   path={`/posts/${encodeURIComponent(post.id)}/replies`}
                   reply
                   signedIn
-                  returnTo={path}
                 />
               </details>
             </PostCard>
@@ -109,6 +108,8 @@ export default async function Thread({
       </CommunityPage>
     );
   const { post, replies, nextCursor } = result.data;
+  const first = cursor ? path : undefined;
+  const next = nextCursor && queryPath(path, { cursor: nextCursor });
   const admin = profile.role === 'admin';
   const topic =
     admin && post.kind === 'idea'
@@ -129,38 +130,43 @@ export default async function Thread({
           </Link>
         )}
       </nav>
-      <div className="community-section">
-        <PostCard post={post} admin={admin} linkToThread={false} />
-      </div>
-      {topic?.status === 'ok' && topic.data.topic.kind === 'community' && (
-        <PromoteIdea postId={post.id} />
-      )}
-      <section className="community-section">
-        <h2>回复帖子</h2>
-        <PostComposer
-          path={`/posts/${encodeURIComponent(post.id)}/replies`}
-          reply
-          signedIn
-          returnTo={path}
+      <IndexedDiscussion
+        title="讨论索引"
+        sections={[
+          { title: '当前帖子', posts: [post] },
+          { title: '本页回复', posts: replies },
+        ]}
+        first={first}
+        next={next}
+      >
+        <PostSearchForm
+          id="scope-thread-search"
+          scope={{ kind: 'thread', value: id }}
         />
-      </section>
-      <section className="community-section">
-        <h2>回复</h2>
-        {replies.length ? (
-          <ReplyList
-            posts={replies}
-            rootId={post.id}
-            path={path}
-            admin={admin}
-          />
-        ) : (
-          <p className="community-message">暂无回复。</p>
+        <div className="community-section">
+          <PostCard post={post} admin={admin} linkToThread={false} />
+        </div>
+        {topic?.status === 'ok' && topic.data.topic.kind === 'community' && (
+          <PromoteIdea postId={post.id} />
         )}
-        <Pager
-          first={cursor ? path : undefined}
-          next={nextCursor && queryPath(path, { cursor: nextCursor })}
-        />
-      </section>
+        <section className="community-section">
+          <h2>回复帖子</h2>
+          <PostComposer
+            path={`/posts/${encodeURIComponent(post.id)}/replies`}
+            reply
+            signedIn
+          />
+        </section>
+        <section className="community-section">
+          <h2>回复</h2>
+          {replies.length ? (
+            <ReplyList posts={replies} rootId={post.id} admin={admin} />
+          ) : (
+            <p className="community-message">暂无回复。</p>
+          )}
+          <Pager first={first} next={next} />
+        </section>
+      </IndexedDiscussion>
     </CommunityPage>
   );
 }

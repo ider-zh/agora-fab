@@ -34,6 +34,30 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
     await admin.goto(`${origin}/admin`);
     await admin.getByRole('link', { name: '管理 Agent' }).click();
     await admin.waitForURL(`${origin}/admin/agents`);
+    await admin.setViewportSize({ width: 320, height: 844 });
+    const table = admin.getByRole('table', { name: '已注册的 Agent' });
+    expect(await table.getByRole('columnheader').allTextContents()).toEqual([
+      '名称',
+      '状态',
+      '所有者',
+      '平台',
+    ]);
+    expect(
+      await table.evaluate((element) => {
+        const tableBox = element.getBoundingClientRect();
+        const lastHeader = element.querySelector('th:last-child');
+        const page = element.ownerDocument.documentElement;
+        return (
+          !!lastHeader &&
+          lastHeader.getBoundingClientRect().right <= tableBox.right &&
+          tableBox.right <= page.clientWidth &&
+          page.scrollWidth === page.clientWidth
+        );
+      }),
+    ).toBe(true);
+    const fixtureRow = table.getByRole('link', { name: /Fixture Agent A/ });
+    expect((await fixtureRow.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    await admin.setViewportSize({ width: 390, height: 844 });
     const invitation = admin.getByRole('region', { name: '邀请 Agent' });
     const invite = invitation.getByRole('button', { name: '邀请 Agent' });
     await invite.waitFor();
@@ -120,6 +144,28 @@ it('lets an administrator invite an owned Agent and manage its one-time credenti
     await manage.and(admin.locator(':focus')).waitFor();
     await manage.click();
     await admin.waitForURL(`${origin}/admin/agents?agent=${handle}`);
+    const detail = admin.getByRole('region', { name: 'Agent 详情' });
+    const invitedRow = table.getByRole('link', {
+      name: new RegExp('@' + handle),
+    });
+    await detail.and(admin.locator(':focus')).waitFor();
+    const close = detail.getByRole('link', { name: '关闭详情' });
+    expect((await close.boundingBox())?.y).toBeLessThan(150);
+    await close.press('Enter');
+    await admin.waitForURL(`${origin}/admin/agents`);
+    await invitedRow.and(admin.locator(':focus')).waitFor();
+    await invitedRow.press('Enter');
+    await admin.waitForURL(`${origin}/admin/agents?agent=${handle}`);
+    await detail.and(admin.locator(':focus')).waitFor();
+    await admin.setViewportSize({ width: 1200, height: 900 });
+    const [tableBox, detailBox] = await Promise.all([
+      table.boundingBox(),
+      detail.boundingBox(),
+    ]);
+    expect(
+      tableBox && detailBox && tableBox.x + tableBox.width < detailBox.x,
+    ).toBe(true);
+    await admin.setViewportSize({ width: 390, height: 844 });
     const profile = admin.getByRole('region', { name: 'Agent 资料' });
     await profile.getByText(ownerHandle, { exact: true }).waitFor();
     await profile.getByText('MCP', { exact: true }).waitFor();
