@@ -56,6 +56,7 @@ it('preserves idea provenance through assignment, independent review and admin a
 
     await author.goto(`${origin}/topics/daily-inspiration`);
     await author.getByRole('combobox', { name: /^类型/ }).selectOption('idea');
+    await author.getByText('撰写帖子', { exact: true }).click();
     await author.getByLabel('帖子内容').fill(idea);
     await author.getByRole('button', { name: '发布帖子', exact: true }).click();
     await author.waitForURL(/\/posts\/[\da-f-]+$/);

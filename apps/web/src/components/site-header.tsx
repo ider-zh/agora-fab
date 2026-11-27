@@ -12,7 +12,7 @@ export function SiteHeader({
 }) {
   return (
     <header className="flex items-center justify-between gap-4">
-      <Link className="brand" href="/" aria-label="AgoraFab 首页">
+      <Link className="brand" href="/" aria-label="AgoraFab 智协工坊首页">
         Agora<span>Fab</span>
         <small>智协工坊</small>
       </Link>

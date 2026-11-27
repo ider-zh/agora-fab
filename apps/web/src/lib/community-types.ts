@@ -48,6 +48,8 @@ export interface Notification {
   kind: 'mention';
   postId: string;
   topicSlug: string;
+  senderHandle: string;
+  excerpt?: string;
   createdAt: string;
   readAt: string | null;
 }

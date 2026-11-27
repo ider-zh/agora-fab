@@ -32,7 +32,10 @@ function excerpt(value: string, maxBytes: number) {
 type CommunityReader = ReturnType<typeof createCommunityReader>;
 type Post = Awaited<ReturnType<CommunityReader['getPost']>>['post'];
 
-function previewPost(post: Post) {
+function previewPost(
+  post: Post,
+  activity?: { reply_count: number; last_reply_at: string },
+) {
   const bodyMd = excerpt(post.bodyMd, 1152);
   return {
     id: post.id,
@@ -46,6 +49,8 @@ function previewPost(post: Post) {
     },
     bodyMd,
     bodyTruncated: bodyMd !== post.bodyMd,
+    replyCount: activity?.reply_count ?? 0,
+    lastReplyAt: activity?.last_reply_at ?? null,
   };
 }
 
@@ -59,11 +64,22 @@ export function createMcpActions(
   const writer = createCommunityWriter(database, reader, authorize);
   const inbox = createInbox(database, authorize);
   return {
-    list_topics: (page) =>
-      reader.listTopics(identity, {
+    async list_topics({ view, ...page }) {
+      const topics = await reader.listTopics(identity, {
         ...page,
         limit: Math.min(page.limit ?? 10, 20),
-      }),
+      });
+      if (view !== 'summary') return topics;
+      return {
+        ...topics,
+        items: topics.items.map(({ slug, kind, title }) => ({
+          id: slug,
+          slug,
+          kind,
+          title,
+        })),
+      };
+    },
     async get_topic_context({ topicId, cursor, limit }) {
       const topic = await reader.getTopic(identity, expandResourceId(topicId));
       const [pinned, recent, projectTasks] = await Promise.all([
@@ -102,6 +118,15 @@ export function createMcpActions(
             ];
           })
         : [];
+      const postIds = [
+        ...new Set([...pinned, ...recent.items].map(({ id }) => id)),
+      ];
+      const activity = new Map(
+        (await reader.listReplyActivity(identity, topic.id, postIds)).map(
+          (entry) => [entry.post_id, entry],
+        ),
+      );
+      const preview = (post: Post) => previewPost(post, activity.get(post.id));
       const context = {
         topic: {
           ...metadata,
@@ -113,8 +138,8 @@ export function createMcpActions(
             guidelines !== guidelinesMd ||
             goal !== goalMd,
         },
-        pinnedPosts: pinned.map(previewPost),
-        recentPosts: recent.items.map(previewPost),
+        pinnedPosts: pinned.map(preview),
+        recentPosts: recent.items.map(preview),
         openTasks,
         nextCursor: recent.nextCursor,
         hasMore: recent.nextCursor !== null,

@@ -18,6 +18,7 @@ afterAll(async () => {
 }, 15_000);
 
 async function publish(page: Page, body: string) {
+  await page.getByText('撰写帖子', { exact: true }).click();
   await page.getByLabel('帖子内容').fill(body);
   await page.getByRole('button', { name: '发布帖子', exact: true }).click();
   await page.waitForURL(/\/posts\/[\da-f-]+$/);
@@ -130,6 +131,13 @@ describe('M2 browser workflows with Next.js, Fastify and PostgreSQL', () => {
       await page.goto(`${origin}/notifications`);
       const mention = page.getByRole('link', { name: '查看提及你的帖子' });
       await mention.waitFor();
+      await page
+        .getByText(`@gh_${browserActors.participant.id}`, { exact: true })
+        .waitFor();
+      await page
+        .getByText(/Browser Markdown check.*Raw HTML fixture/)
+        .waitFor();
+      expect(await page.locator('[data-raw-fixture]').count()).toBe(0);
       const mentionPath = await mention.getAttribute('href');
       expect(mentionPath).toBe(new URL(postUrl).pathname);
       const markRead = page.getByRole('button', {
