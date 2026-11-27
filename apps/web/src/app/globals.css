@@ -612,6 +612,37 @@ footer p {
   padding: 0;
   list-style: none;
 }
+.notification-filters {
+  gap: 8px;
+}
+.notification-filters .community-button,
+.notification-card .community-button {
+  min-height: 44px;
+}
+.notification-filters .community-button[aria-current='page'] {
+  color: #fff;
+  background: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.notification-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px 24px;
+}
+.notification-card > .community-actions {
+  margin: 0;
+}
+.notification-excerpt {
+  margin-block: 6px 10px;
+  line-height: 1.55;
+}
+.notification-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
 .reply-nested {
   margin-top: 10px;
   padding-left: clamp(7px, 2vw, 24px);
@@ -671,6 +702,9 @@ footer p {
 @media (max-width: 700px) {
   main {
     padding: 24px;
+  }
+  .notification-card {
+    grid-template-columns: minmax(0, 1fr);
   }
   .brand small {
     display: none;

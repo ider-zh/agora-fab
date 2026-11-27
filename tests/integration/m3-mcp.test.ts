@@ -80,6 +80,80 @@ const rpcHeaders = {
 const topicId = 'daily-inspiration';
 
 describe('official SDK clients over Streamable HTTP', () => {
+  it('offers a smaller Topic directory with compatible cursors and full details on entry', async () => {
+    const agent = await fixture.issue(fixture.fixtureIds.agentA, [
+      'community:write',
+    ]);
+    await withClient(agent, async (client) => {
+      const full = (await tool(client, 'list_topics', { limit: 1 }))
+        .structuredContent!;
+      const small = (
+        await tool(client, 'list_topics', { limit: 1, view: 'summary' })
+      ).structuredContent!;
+      const [item] = small.items as { id: string; slug: string }[];
+      if (!item) throw new Error('Expected a Topic summary.');
+      expect(item.id).toBe(item.slug);
+      expect(Object.keys(item).sort()).toEqual(['id', 'kind', 'slug', 'title']);
+      expect(small.nextCursor).toBe(full.nextCursor);
+      expect(Buffer.byteLength(JSON.stringify(small))).toBeLessThan(
+        Buffer.byteLength(JSON.stringify(full)),
+      );
+      const next = await tool(client, 'list_topics', {
+        cursor: small.nextCursor,
+        view: 'full',
+      });
+      expect(next.isError).toBeUndefined();
+      const context = await tool(client, 'get_topic_context', {
+        topicId: item.slug,
+      });
+      expect(context.structuredContent?.topic).toMatchObject({
+        slug: item.slug,
+        guidelinesMd: expect.any(String),
+      });
+    });
+  });
+
+  it('reports visible descendant activity in the bounded Topic preview', async () => {
+    const agent = await fixture.issue(fixture.fixtureIds.agentA, [
+      'community:write',
+    ]);
+    await withClient(agent, async (client) => {
+      const write = async (name: string, target: object) =>
+        expectPost(
+          await tool(client, name, {
+            ...target,
+            bodyMd: 'Reply activity fixture',
+            idempotencyKey: randomUUID(),
+          }),
+          'fixture_agent_a',
+        );
+      const root = await write('create_post', { topicId });
+      const visible = await write('reply_post', { postId: root.id });
+      const hidden = await write('reply_post', { postId: root.id });
+      await write('reply_post', { postId: hidden.id });
+      const moderation = await fixture.app.inject({
+        method: 'POST',
+        url: `/api/admin/posts/${expandResourceId(hidden.id)}/hide`,
+        headers: { ...fixture.admin, 'idempotency-key': randomUUID() },
+        payload: { reason: 'Test that hidden branches do not count' },
+      });
+      expect(moderation.statusCode).toBe(204);
+      const pack = await tool(client, 'get_topic_context', {
+        topicId,
+        limit: 1,
+      });
+      const reply = await tool(client, 'get_post', { postId: visible.id });
+      expect(pack.structuredContent?.recentPosts).toEqual([
+        expect.objectContaining({
+          id: root.id,
+          replyCount: 1,
+          lastReplyAt: (reply.structuredContent?.post as { createdAt: string })
+            .createdAt,
+        }),
+      ]);
+    });
+  });
+
   it('provisions a stable development Agent and shares post references across MCP and REST', async () => {
     const { app, database } = fixture;
     const operator = createIdentityService(database);

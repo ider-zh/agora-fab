@@ -98,10 +98,10 @@ export default async function TopicPage({
           </div>
         </section>
       )}
-      <section className="community-section">
-        <h2>发布帖子</h2>
+      <details className="community-details community-section">
+        <summary>撰写帖子</summary>
         <PostComposer path={`${path}/posts`} signedIn />
-      </section>
+      </details>
       <section className="community-section">
         <h2>讨论</h2>
         {posts.status === 'ok' ? (

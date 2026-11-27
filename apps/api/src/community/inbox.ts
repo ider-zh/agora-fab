@@ -1,4 +1,10 @@
-import { notifications, posts, topics, type Database } from '@agorafab/db';
+import {
+  notifications,
+  posts,
+  principals,
+  topics,
+  type Database,
+} from '@agorafab/db';
 import { DomainError, requireAction, type AuthContext } from '@agorafab/domain';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { AuthorizeMutation } from '../traffic.js';
@@ -10,6 +16,8 @@ import {
   type ListPageOptions,
 } from './cursor.js';
 import { publicPostVisibility } from './read.js';
+
+const excerptLength = 160;
 
 export function createInbox(
   database: Database,
@@ -28,12 +36,15 @@ export function createInbox(
         kind: notifications.kind,
         postId: notifications.postId,
         topicSlug: topics.slug,
+        senderHandle: principals.handle,
+        excerpt: sql<string>`left(btrim(regexp_replace(${posts.bodyMd}, '[[:space:]]+', ' ', 'g')), ${excerptLength + 1})`,
         createdAt: cursorTimestamp(notifications.createdAt),
         readAt: notifications.readAt,
       })
       .from(notifications)
       .innerJoin(posts, eq(posts.id, notifications.postId))
       .innerJoin(topics, eq(topics.id, posts.topicId))
+      .innerJoin(principals, eq(principals.id, posts.authorId))
       .where(
         and(
           eq(notifications.recipientId, actor.id),
@@ -50,7 +61,24 @@ export function createInbox(
       )
       .orderBy(desc(notifications.createdAt), desc(notifications.id))
       .limit(limit + 1);
-    return slicePage(rows, limit, scope);
+    const { items, nextCursor } = slicePage(rows, limit, scope);
+    return {
+      items: items.map(({ excerpt, ...item }) => {
+        const symbols = Array.from(excerpt);
+        if (!symbols.length) return item;
+        return {
+          ...item,
+          excerpt:
+            symbols.length > excerptLength
+              ? symbols
+                  .slice(0, excerptLength - 1)
+                  .join('')
+                  .trimEnd() + '…'
+              : excerpt,
+        };
+      }),
+      nextCursor,
+    };
   }
 
   async function acknowledge(auth: AuthContext | null, id: string) {

@@ -49,6 +49,13 @@ it('keeps sign-in and Topic navigation usable by keyboard at 390 CSS pixels', as
     await page
       .getByRole('heading', { name: 'Daily Inspiration', level: 1 })
       .waitFor();
+    const composer = page.getByLabel('帖子内容');
+    expect(await composer.isVisible()).toBe(false);
+    await tabTo(page, page.getByText('撰写帖子', { exact: true }));
+    await page.keyboard.press('Enter');
+    await composer.waitFor({ state: 'visible' });
+    await tabTo(page, composer);
+    await page.getByText('撰写帖子', { exact: true }).click();
     await tabTo(page, page.getByText('分享给 Agent', { exact: true }));
     await page.keyboard.press('Enter');
     await tabTo(page, page.getByRole('textbox', { name: '加入指引' }));

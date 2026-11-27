@@ -53,14 +53,19 @@ export default async function Notifications({
         );
   return (
     <CommunityPage page="notifications" title="通知" signedIn>
-      <nav className="community-actions" aria-label="筛选通知">
+      <nav
+        className="community-actions notification-filters"
+        aria-label="筛选通知"
+      >
         <Link
+          className="community-button clear"
           href="/notifications"
           aria-current={!unreadOnly ? 'page' : undefined}
         >
           全部
         </Link>
         <Link
+          className="community-button clear"
           href="/notifications?unread=1"
           aria-current={unreadOnly ? 'page' : undefined}
         >
@@ -73,25 +78,51 @@ export default async function Notifications({
           {result.data.items.length ? (
             <ul className="community-list notification-list">
               {result.data.items.map((item) => (
-                <li key={item.id} className="community-card">
-                  <div className="post-byline">
-                    <strong>{item.readAt ? '已读提及' : '未读提及'}</strong>
-                    <Time value={item.createdAt} />
+                <li key={item.id} className="community-card notification-card">
+                  <div>
+                    <div className="post-byline">
+                      <strong>{item.readAt ? '已读提及' : '未读提及'}</strong>
+                      {item.senderHandle && <span>@{item.senderHandle}</span>}
+                      <Time value={item.createdAt} />
+                    </div>
+                    {item.excerpt && (
+                      <p
+                        id={`inbox-excerpt-${item.id}`}
+                        className="notification-excerpt"
+                      >
+                        {item.excerpt}
+                      </p>
+                    )}
+                    <div className="notification-links">
+                      <Link
+                        className="community-link"
+                        href={`/posts/${encodeURIComponent(item.postId)}`}
+                        aria-label={
+                          item.senderHandle
+                            ? `查看提及你的帖子 · @${item.senderHandle}`
+                            : undefined
+                        }
+                        aria-describedby={
+                          item.excerpt ? `inbox-excerpt-${item.id}` : undefined
+                        }
+                      >
+                        查看提及你的帖子
+                      </Link>
+                      <Link
+                        className="community-link"
+                        href={`/topics/${encodeURIComponent(item.topicSlug)}`}
+                      >
+                        {item.topicSlug}
+                      </Link>
+                    </div>
                   </div>
-                  <Link
-                    className="community-link"
-                    href={`/posts/${encodeURIComponent(item.postId)}`}
-                  >
-                    查看提及你的帖子
-                  </Link>
-                  {' · '}
-                  <Link
-                    className="community-link"
-                    href={`/topics/${encodeURIComponent(item.topicSlug)}`}
-                  >
-                    {item.topicSlug}
-                  </Link>
-                  {!item.readAt && <ReadButton id={item.id} />}
+                  {!item.readAt && (
+                    <ReadButton
+                      id={item.id}
+                      senderHandle={item.senderHandle}
+                      hasExcerpt={!!item.excerpt}
+                    />
+                  )}
                 </li>
               ))}
             </ul>

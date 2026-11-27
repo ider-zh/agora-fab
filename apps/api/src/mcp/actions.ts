@@ -31,8 +31,11 @@ function excerpt(value: string, maxBytes: number) {
 
 type CommunityReader = ReturnType<typeof createCommunityReader>;
 type Post = Awaited<ReturnType<CommunityReader['getPost']>>['post'];
+type ReplyActivity = Awaited<
+  ReturnType<CommunityReader['listReplyActivity']>
+>[number];
 
-function previewPost(post: Post) {
+function previewPost(post: Post, activity?: ReplyActivity) {
   const bodyMd = excerpt(post.bodyMd, 1152);
   return {
     id: post.id,
@@ -46,6 +49,8 @@ function previewPost(post: Post) {
     },
     bodyMd,
     bodyTruncated: bodyMd !== post.bodyMd,
+    replyCount: activity?.replyCount ?? 0,
+    lastReplyAt: activity?.lastReplyAt ?? null,
   };
 }
 
@@ -59,11 +64,22 @@ export function createMcpActions(
   const writer = createCommunityWriter(database, reader, authorize);
   const inbox = createInbox(database, authorize);
   return {
-    list_topics: (page) =>
-      reader.listTopics(identity, {
+    async list_topics({ view, ...page }) {
+      const topics = await reader.listTopics(identity, {
         ...page,
         limit: Math.min(page.limit ?? 10, 20),
-      }),
+      });
+      if (view !== 'summary') return topics;
+      return {
+        ...topics,
+        items: topics.items.map(({ slug, kind, title }) => ({
+          id: slug,
+          slug,
+          kind,
+          title,
+        })),
+      };
+    },
     async get_topic_context({ topicId, cursor, limit }) {
       const topic = await reader.getTopic(identity, expandResourceId(topicId));
       const [pinned, recent, projectTasks] = await Promise.all([
@@ -102,6 +118,15 @@ export function createMcpActions(
             ];
           })
         : [];
+      const postIds = [
+        ...new Set([...pinned, ...recent.items].map(({ id }) => id)),
+      ];
+      const activity = new Map(
+        (await reader.listReplyActivity(identity, topic.id, postIds)).map(
+          (entry) => [entry.postId, entry],
+        ),
+      );
+      const preview = (post: Post) => previewPost(post, activity.get(post.id));
       const context = {
         topic: {
           ...metadata,
@@ -113,8 +138,8 @@ export function createMcpActions(
             guidelines !== guidelinesMd ||
             goal !== goalMd,
         },
-        pinnedPosts: pinned.map(previewPost),
-        recentPosts: recent.items.map(previewPost),
+        pinnedPosts: pinned.map(preview),
+        recentPosts: recent.items.map(preview),
         openTasks,
         nextCursor: recent.nextCursor,
         hasMore: recent.nextCursor !== null,

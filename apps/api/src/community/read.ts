@@ -188,6 +188,37 @@ export function createCommunityReader(database: Database) {
     return { post, replies: items, nextCursor };
   }
 
+  async function listReplyActivity(
+    auth: AuthContext | null,
+    topicId: string,
+    postIds: readonly string[],
+  ) {
+    requirePrincipal(auth);
+    if (!postIds.length) return [];
+    const roots = sql`array[${sql.join(
+      postIds.map((id) => sql`${id}::uuid`),
+      sql`, `,
+    )}]`;
+    const result = await db.execute<{
+      postId: string;
+      replyCount: number;
+      lastReplyAt: string;
+    }>(sql`
+      select activity.post_id as "postId", count(*)::int as "replyCount",
+        ${cursorTimestamp(sql`max(${posts.createdAt})`)} as "lastReplyAt"
+      from ${posts}
+      inner join ${topics} on ${topics.id} = ${posts.topicId}
+      cross join lateral unnest(${posts.ancestorIds}) as activity(post_id)
+      where ${posts.topicId} = ${topicId}::uuid
+        and ${activeTopic}
+        and ${posts.ancestorIds} && ${roots}
+        and activity.post_id = any(${roots})
+        and ${publicPostVisibility()}
+      group by activity.post_id
+    `);
+    return result.rows;
+  }
+
   async function search(
     auth: AuthContext | null,
     { q, ...options }: ListPageOptions & { q: string },
@@ -267,6 +298,7 @@ export function createCommunityReader(database: Database) {
     getTopic,
     listPosts,
     getPost,
+    listReplyActivity,
     search,
     listPinned,
     getModeratedPost,
