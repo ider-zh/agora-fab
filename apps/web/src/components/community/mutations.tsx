@@ -129,6 +129,7 @@ export function PostComposer({
         event.preventDefault();
         const form = event.currentTarget;
         const fields = new FormData(form);
+        setPublishedReply(undefined);
         const result = await mutation.submit<{ post: Post }>(path, {
           bodyMd: String(fields.get('body') ?? ''),
           kind: fields.get('kind') ?? 'discussion',

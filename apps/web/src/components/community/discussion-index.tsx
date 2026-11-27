@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { Post } from '../../lib/community-types';
+import { DiscussionIndexDisclosure } from './discussion-index-disclosure';
 
 export interface IndexSection {
   title: string;
@@ -38,8 +39,7 @@ export function IndexedDiscussion({
   return (
     <div className="indexed-discussion">
       <aside className="discussion-index" aria-label={title}>
-        <details id="discussion-index" open>
-          <summary>{title}</summary>
+        <DiscussionIndexDisclosure title={title}>
           <nav tabIndex={0} aria-label="跳转到本页内容">
             {available.map(({ title: label, posts, prefix }) => (
               <section key={label} aria-label={label}>
@@ -66,7 +66,7 @@ export function IndexedDiscussion({
               )}
             </div>
           )}
-        </details>
+        </DiscussionIndexDisclosure>
       </aside>
       <div className="indexed-discussion-body">{children}</div>
     </div>

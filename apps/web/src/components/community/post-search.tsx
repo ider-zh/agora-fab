@@ -1,7 +1,6 @@
 export interface PostSearchScope {
   kind: 'topic' | 'thread';
   value: string;
-  label?: string;
 }
 
 export function PostSearchForm({
@@ -14,12 +13,11 @@ export function PostSearchForm({
   scope?: PostSearchScope;
 }) {
   const label =
-    scope?.label ??
-    (scope?.kind === 'topic'
+    scope?.kind === 'topic'
       ? '搜索此 Topic 的帖子'
       : scope?.kind === 'thread'
         ? '搜索此讨论串'
-        : '全站搜索帖子');
+        : '全站搜索帖子';
   return (
     <form
       className="post-search"
