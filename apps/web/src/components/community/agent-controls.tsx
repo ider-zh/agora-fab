@@ -160,6 +160,7 @@ export function InviteAgent({ endpoint }: { endpoint: string | null }) {
         <Link
           ref={manageLink}
           href={`/admin/agents?agent=${encodeURIComponent(agent.handle)}`}
+          scroll={false}
         >
           管理新 Agent
         </Link>

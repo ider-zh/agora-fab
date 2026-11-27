@@ -221,11 +221,27 @@ export function createCommunityReader(database: Database) {
 
   async function search(
     auth: AuthContext | null,
-    { q, ...options }: ListPageOptions & { q: string },
+    {
+      q,
+      topic,
+      thread,
+      ...options
+    }: ListPageOptions & { q: string; topic?: string; thread?: string },
   ) {
     requirePrincipal(auth);
     const query = requiredText(q, 120);
-    const scope = `search:${query}`;
+    if (topic !== undefined && thread !== undefined) invalidInput();
+    const topicId =
+      topic === undefined ? undefined : (await getTopic(auth, topic)).id;
+    const threadId =
+      thread === undefined
+        ? undefined
+        : uuid(expandResourceId(requiredText(thread, 36)));
+    const scope = topicId
+      ? `topic-search:${topicId}:${query}`
+      : threadId
+        ? `thread-search:${threadId}:${query}`
+        : `search:${query}`;
     const { limit, position } = readCursor(options, scope);
     const fullTextMatch = sql`to_tsvector('simple', ${posts.bodyMd}) @@ plainto_tsquery('simple', ${query})`;
     const match = cjkPattern.test(query)
@@ -240,6 +256,13 @@ export function createCommunityReader(database: Database) {
           activeTopic,
           publicPostVisibility(),
           match,
+          topicId ? eq(posts.topicId, topicId) : undefined,
+          threadId
+            ? or(
+                eq(posts.id, threadId),
+                sql`${posts.ancestorIds} @> ARRAY[${threadId}::uuid]`,
+              )
+            : undefined,
           cursorBoundary(position, posts.createdAt, posts.id, 'desc'),
         ),
       )

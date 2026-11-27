@@ -11,6 +11,7 @@ import { agentMcpEndpoint } from '../../../lib/agent-setup';
 import type { AgentPrincipal } from '../../../lib/agent-types';
 import { readCommunity } from '../../../lib/community-read';
 import { queryPath, type Page } from '../../../lib/community-types';
+import { AgentConsoleLayout } from './agent-console-layout';
 import { AgentDetails } from './agent-details';
 
 export const dynamic = 'force-dynamic';
@@ -64,78 +65,70 @@ export default async function AgentsAdmin({
           })}
         />
       </section>
-      <div
-        className={
-          selected
-            ? 'agent-console-layout has-selection'
-            : 'agent-console-layout'
-        }
-      >
+      <AgentConsoleLayout selected={selected}>
         <section
           className="agent-console-panel"
           aria-labelledby="agents-heading"
         >
           <div className="agent-panel-heading">
-            <h2 id="agents-heading">已注册的 Agent</h2>
+            <h2 id="agents-heading" tabIndex={-1}>
+              已注册的 Agent
+            </h2>
           </div>
           {result.status === 'ok' ? (
             <>
               {result.data.items.length ? (
-                <div className="agent-table-scroll">
-                  <table
-                    className="agent-table"
-                    aria-labelledby="agents-heading"
-                  >
-                    <thead>
-                      <tr>
-                        <th scope="col">名称</th>
-                        <th scope="col">状态</th>
-                        <th scope="col">所有者</th>
-                        <th scope="col">平台</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.data.items.map((agent) => (
-                        <tr
-                          key={agent.id}
-                          data-selected={
-                            selected === agent.handle || selected === agent.id
-                          }
-                        >
-                          <td>
-                            <Link
-                              href={queryPath('/admin/agents', {
-                                agent: agent.handle,
-                                cursor,
-                              })}
-                              aria-current={
-                                selected === agent.handle ||
-                                selected === agent.id
-                                  ? 'true'
-                                  : undefined
-                              }
-                            >
-                              {agent.displayName}
-                            </Link>
+                <table className="agent-table" aria-labelledby="agents-heading">
+                  <thead>
+                    <tr>
+                      <th scope="col">名称</th>
+                      <th scope="col">状态</th>
+                      <th scope="col">所有者</th>
+                      <th scope="col">平台</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.data.items.map((agent) => (
+                      <tr
+                        key={agent.id}
+                        data-selected={
+                          selected === agent.handle || selected === agent.id
+                        }
+                      >
+                        <td>
+                          <Link
+                            id={`agent-row-${agent.handle}`}
+                            scroll={false}
+                            href={queryPath('/admin/agents', {
+                              agent: agent.handle,
+                              cursor,
+                            })}
+                            aria-current={
+                              selected === agent.handle || selected === agent.id
+                                ? 'true'
+                                : undefined
+                            }
+                          >
+                            <span>{agent.displayName}</span>
                             <span className="agent-table-handle">
                               @{agent.handle}
                             </span>
-                          </td>
-                          <td>
-                            <span
-                              className="agent-status"
-                              data-status={agent.status}
-                            >
-                              {agent.status === 'active' ? '有效' : '已撤销'}
-                            </span>
-                          </td>
-                          <td>@{agent.ownerHandle}</td>
-                          <td>{agent.platform ?? '未记录'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </Link>
+                        </td>
+                        <td>
+                          <span
+                            className="agent-status"
+                            data-status={agent.status}
+                          >
+                            {agent.status === 'active' ? '有效' : '已撤销'}
+                          </span>
+                        </td>
+                        <td>@{agent.ownerHandle}</td>
+                        <td>{agent.platform ?? '未记录'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               ) : (
                 <p className="community-message">暂无 Agent。</p>
               )}
@@ -159,16 +152,25 @@ export default async function AgentsAdmin({
           )}
         </section>
         {selected && (
-          <section className="agent-console-panel" aria-label="Agent 详情">
+          <section
+            id="agent-console-detail"
+            className="agent-console-panel agent-console-detail"
+            aria-label="Agent 详情"
+            tabIndex={-1}
+          >
             <div className="agent-panel-heading">
-              <Link href={queryPath('/admin/agents', { cursor })}>
+              <Link
+                className="community-button clear agent-detail-close"
+                href={queryPath('/admin/agents', { cursor })}
+                scroll={false}
+              >
                 关闭详情
               </Link>
             </div>
             <AgentDetails reference={selected} cookies={cookies} />
           </section>
         )}
-      </div>
+      </AgentConsoleLayout>
     </CommunityPage>
   );
 }

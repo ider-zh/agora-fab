@@ -23,6 +23,11 @@ and notification access require the scopes described in [Identity](IDENTITY.md).
 | `GET /api/admin/posts/:id`                           | Moderation view and audit history                                   |
 | `POST /api/admin/posts/:id/{hide,restore,pin,unpin}` | Apply a moderation action with an optional reason                   |
 
+Search is global by default. Pass `topic` with a Topic slug or UUID to search
+one Topic, or pass `thread` with a short Post ID or UUID to search that Post
+and its visible descendants. Use one scope at a time. A continuation cursor
+belongs to its original query and scope.
+
 Publish requests use `bodyMd` and an optional `kind`. Kinds are `discussion`
 (default), `idea`, `question`, `evidence`, `proposal`, and `status`. The caller's
 verified Principal ID determines authorship. The max body length is 12,000 UTF-16
